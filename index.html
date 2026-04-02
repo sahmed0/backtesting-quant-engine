@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="public/favicon/favicon-16x16.png?v=2">
     <link rel="manifest" href="public/favicon/site.webmanifest?v=2">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backtesting Engine WebAssembly</title>
+    <title>Backtesting Engine | Sajid Ahmed</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,7 +27,7 @@
             background: linear-gradient(180deg, #AA7BC3 0%, #CC92C2 50%, #DBA8AC 100%);
             color: #1a1a1a;
             display: flex;
-            flex-direction: column;
+            flex-direction:column;
             align-items: center;
         }
 
@@ -63,7 +63,7 @@
         }
 
         h1 {
-            font-size: 28px;
+            font-size: 2rem;
             margin-bottom: 10px;
         }
 
@@ -95,7 +95,7 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 1.2rem;
             font-weight: 600;
             transition: all 0.3s ease;
             box-shadow: 0 4px 15px rgba(139, 76, 175, 0.3);
@@ -138,7 +138,7 @@
         }
 
         .metric-label {
-            font-size: 14px;
+            font-size: 1rem;
             color: #555;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -156,7 +156,7 @@
             margin-top: 15px;
             font-weight: 600;
             color: #531CB3;
-            font-size: 14px;
+            font-size: 1rem;
         }
 
         #Order\ Book {
@@ -187,8 +187,8 @@
         }
 
         .social-icons svg {
-            width: 36px;
-            height: 36px;
+            width: 3rem;
+            height: 3rem;
             fill: currentColor;
         }
 
@@ -214,7 +214,7 @@
                 max-width: 100%; /* Full width button on mobile */
             }
             h1 {
-                font-size: 24px;
+                font-size: 2rem;
             }
         }
     </style>
@@ -224,7 +224,8 @@
     <div class="container">
         <div class="card">
             <h1>Backtesting Engine</h1>
-            <p>Upload a CSV file with historical stock data to run the backtest locally in your browser.</p>
+            <p>Upload a CSV file with historical stock price data to run the backtest locally in your browser.</p>
+            <p>The backtest currently works only for a simple Moving Average strategy. An Ornstein-Uhlenbeck Mean Reversion strategy is under development.</p>
             
             <div class="upload-section">
                 <label for="csv-upload" style="font-weight: 600; color: #333;">Select CSV Data:</label>
@@ -232,7 +233,7 @@
             </div>
             
             <button id="run-btn" disabled>Run Backtest</button>
-            <div id="status">Loading Python environment...</div>
+            <div id="status">Loading Python environment and initialising backtest engine...</div>
         </div>
 
         <div class="card">
@@ -261,6 +262,7 @@
     </div>
 
     <footer>
+        <div style="font-size: 1rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 5px;">© 2026 Sajid Ahmed</div>
         <div class="social-icons">
             <a href="https://github.com/sahmed0" target="_blank" aria-label="GitHub">
                 <svg viewBox="0 0 24 24">
