@@ -2,6 +2,7 @@
 .pixi/*
 !.pixi/config.toml
 
-.pytest_cache/
+# cache
 __pycache__/
+.pytest_cache/
 *.pyc

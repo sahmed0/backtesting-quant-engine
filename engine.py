@@ -31,7 +31,7 @@ class Backtest:
         self.execution_handler = execution_handler
         self.queue = event_queue
 
-    def run(self):
+    async def run(self):
         """
         Executes the backtest logic.
         """

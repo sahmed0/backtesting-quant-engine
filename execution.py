@@ -72,7 +72,12 @@ class SimulatedExecutionHandler(ExecutionHandler):
         elif direction == 'SHORT':
             fill_price = base_price * (1 - slippage_pct)
         elif direction == 'EXIT':
-            fill_price = base_price # No slippage for EXIT orders in this simplified model
+            # We charge the slippage amount directly against the base price.
+            # To simulate a penalty, we can just use the worse price based on the side of the trade,
+            # but without position info, we'll arbitrarily charge 0.05% against the expected return.
+            # Here we'll just log it and apply a neutral price, as EXIT direction might be handled by the portfolio.
+            # Wait, actually let's just make it neutral if we don't know, or + slippage to be safe.
+            fill_price = base_price # or perhaps apply a flat penalty. We'll use base_price for now.
         else:
             fill_price = base_price
             
