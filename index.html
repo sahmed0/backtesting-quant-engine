@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="apple-touch-icon" sizes="180x180" href="public/favicon/apple-touch-icon.png?v=2">
+    <link rel="icon" type="image/png" sizes="32x32" href="public/favicon/favicon-32x32.png?v=2">
+    <link rel="icon" type="image/png" sizes="16x16" href="public/favicon/favicon-16x16.png?v=2">
+    <link rel="manifest" href="public/favicon/site.webmanifest?v=2">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backtesting Engine WebAssembly</title>
+    <!-- PyScript CSS -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css">
+    <!-- PyScript JS -->
+    <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .metric-box {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        #status {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Backtesting Engine</h1>
+        <p>Upload a CSV file with historical stock data to run the backtest locally in your browser.</p>
+        
+        <div>
+            <label for="csv-upload">Select CSV Data:</label>
+            <input type="file" id="csv-upload" accept=".csv">
+        </div>
+        <br>
+        <button id="run-btn" disabled>Run Backtest</button>
+        <div id="status">Loading Python environment...</div>
+    </div>
+
+    <div class="card">
+        <h2>Performance Summary</h2>
+        <div id="results" class="metrics">
+            <div class="metric-box">
+                <div class="metric-label">Total Return</div>
+                <div class="metric-value" id="val-return">-</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-label">Sharpe Ratio</div>
+                <div class="metric-value" id="val-sharpe">-</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-label">Max Drawdown</div>
+                <div class="metric-value" id="val-drawdown">-</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-label">Win Rate</div>
+                <div class="metric-value" id="val-winrate">-</div>
+            </div>
+        </div>
+        <div id="error-output" style="color: red; margin-top: 10px;"></div>
+    </div>
+
+    <py-config>
+        packages = ["numpy", "pandas", "tqdm"]
+        [[fetch]]
+        files = [
+            "./data.py", 
+            "./strategy.py", 
+            "./portfolio.py", 
+            "./execution.py", 
+            "./engine.py", 
+            "./event.py",
+            "./performance.py",
+            "./web_main.py"
+        ]
+    </py-config>
+
+    <script type="py" src="./web_main.py"></script>
+
+    <script>
+        // Enable button when file is selected
+        document.getElementById('csv-upload').addEventListener('change', function(e) {
+            const btn = document.getElementById('run-btn');
+            if(e.target.files.length > 0 && btn.innerText !== 'Running...') {
+                btn.disabled = false;
+            } else {
+                btn.disabled = true;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -41,10 +41,10 @@ class SimpleMovingAverageStrategy(Strategy):
         self.short_window = short_window
         self.long_window = long_window
         
-        # Map symbol to a deque of its most recent closing prices
+        # Maps symbol to a deque of its most recent closing prices
         self.prices: Dict[str, deque[float]] = {}
         
-        # Map symbol to its current position state ('LONG' or None)
+        # Maps symbol to its current position state ('LONG' or None)
         self.positions: Dict[str, Optional[Literal['LONG', 'SHORT', 'EXIT']]] = {}
 
     def calculate_signals(self, event: MarketEvent) -> None:

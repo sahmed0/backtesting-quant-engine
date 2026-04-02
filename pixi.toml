@@ -1,20 +1,19 @@
 [workspace]
 authors = ["Sajid <95769563+sahmed0@users.noreply.github.com>"]
 channels = ["conda-forge"]
-name = "quant_engine_pure"
+name = "backtesting-engine-web"
 platforms = ["win-64"]
 version = "0.1.0"
+
+[tasks]
 
 [dependencies]
 numpy = ">=2.4.3,<3"
 pandas = ">=3.0.1,<4"
-polars = ">=1.39.3,<2"
 tqdm = ">=4.67.3,<5"
 python = "3.12.*"
 pytest = ">=9.0.2,<10"
+pluggy = "=1.5.0" # locked dependency for pyscript
 
 [pypi-dependencies]
-curl-cffi = "==0.13.0"
-yfinance = "==1.2.0"
-
-# pip = "*" # Required to allow editable installs
+pyscript = "==0.3.3"

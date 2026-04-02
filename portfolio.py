@@ -4,7 +4,8 @@ Portfolio module for the backtesting engine.
 
 from typing import Dict, List, Any
 from queue import Queue
-import polars as pl
+import pandas as pd
+# import polars as pl # deprecating in favor of Pandas to work with PyScript
 from event import MarketEvent, SignalEvent, OrderEvent, FillEvent
 
 class Portfolio:
@@ -63,11 +64,11 @@ class Portfolio:
         # Update current holdings with cash, total, and timestamp
         self.current_holdings['cash'] = self.current_cash
         self.current_holdings['total'] = total_equity
-        self.current_holdings['timestamp'] = timestamp
+        self.current_holdings['timestamp'] = timestamp.timestamp() # convert datetime to float
         
         # Append snapshots to history
         pos_snapshot = self.current_positions.copy()
-        pos_snapshot['timestamp'] = timestamp
+        pos_snapshot['timestamp'] = timestamp.timestamp() # convert datetime to float
         self.all_positions.append(pos_snapshot)
         
         self.all_holdings.append(self.current_holdings.copy())
@@ -80,9 +81,9 @@ class Portfolio:
         direction = event.direction
         timestamp = event.timestamp
         
-        # Simplified position sizing: fixed quantity
-        # In a real system, would calculate this based on risk, eg. Kelly criterion
-        order_quantity = 100.0
+        # Naive position sizing: fixed quantity
+        # In a real system, you'd calculate this based on risk.
+        order_quantity = 100.0 
         
         current_price = self.current_prices.get(symbol, 0.0)
         
@@ -132,16 +133,29 @@ class Portfolio:
             self.current_cash -= total_cost
         elif direction in ('SHORT', 'EXIT'):
             self.current_positions[symbol] -= quantity
-            # Assume EXIT implies selling an existing long position.
+            # Assuming EXIT implies selling an existing long position.
             # Cash increases by the fill cost, minus transaction costs
             self.current_cash += (fill_cost - commission - slippage)
 
+    """
+    # POLARS VERSION - DEPRECATED IN FAVOR OF PANDAS DATEFRAME FOR BETTER COMPATIBILITY WITH PYSCRIPT
     def generate_equity_curve(self) -> pl.DataFrame:
-        """
-        Returns a Polars DataFrame of the total equity over time.
-        """
+        # Returns a Polars DataFrame of the total equity over time.
         if not self.all_holdings:
             return pl.DataFrame()
             
         df = pl.DataFrame(self.all_holdings)
         return df.select(['timestamp', 'total'])
+        """
+
+    def generate_equity_curve(self) -> pd.DataFrame:
+        """
+        Returns a Pandas DataFrame of the total equity over time.
+        """
+        if not self.all_holdings:
+            return pd.DataFrame()
+            
+        df = pd.DataFrame(self.all_holdings)
+        
+        # In Pandas, filter columns by passing a list to the indexer
+        return df[['timestamp', 'total']]
