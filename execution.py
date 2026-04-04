@@ -11,8 +11,8 @@ from typing import Any
 from event import OrderEvent, FillEvent
 from data import DataHandler
 
-# Configure basic logging for the console
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Configure console logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
 class ExecutionHandler(ABC):
@@ -52,7 +52,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
         latest_bar = self.dataHandler.getLatestBar(event.symbol)
         
-        # If no bar data is available, we cannot execute the order realistically in this simulation.
+        # If no bar data is available, we cannot execute the order in this simulation.
         if not latest_bar or 'close' not in latest_bar:
             logger.warning(f"No price data available for {event.symbol}. Cannot execute order.")
             return
@@ -72,12 +72,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         elif direction == 'SHORT':
             fill_price = base_price * (1 - slippage_pct)
         elif direction == 'EXIT':
-            # We charge the slippage amount directly against the base price.
-            # To simulate a penalty, we can just use the worse price based on the side of the trade,
-            # but without position info, we'll arbitrarily charge 0.05% against the expected return.
-            # Here we'll just log it and apply a neutral price, as EXIT direction might be handled by the portfolio.
-            # Wait, actually let's just make it neutral if we don't know, or + slippage to be safe.
-            fill_price = base_price # or perhaps apply a flat penalty. We'll use base_price for now.
+            fill_price = base_price # No slippage for EXIT orders in this simplified model
         else:
             fill_price = base_price
             
@@ -86,7 +81,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # Create FillEvent
         fill_event = FillEvent(
             symbol=event.symbol,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=event.timestamp,
             quantity=event.quantity,
             direction=event.direction,
             fillPrice=fill_price,
@@ -96,7 +91,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
         # Log the fill
         logger.info(
-            f"FILLED {fill_event.direction} {fill_event.quantity} {fill_event.symbol} "
+            f"FILLED {fill_event.timestamp} {fill_event.direction} {fill_event.quantity} {fill_event.symbol} "
             f"@ {fill_event.fillPrice:.4f} (comm: {fill_event.commission}, slippage: {fill_event.slippage:.4f})"
         )
 
