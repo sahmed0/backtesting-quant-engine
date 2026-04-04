@@ -21,6 +21,8 @@ class Portfolio:
         self.initial_capital = initial_capital
         self.current_cash = initial_capital
         
+        self.trades: List[Dict[str, Any]] = []
+        
         # symbol: quantity
         self.current_positions: Dict[str, float] = {}
         # List of historical positions snapshots
@@ -53,6 +55,7 @@ class Portfolio:
         market_value = quantity * price
         
         self.current_holdings[symbol] = market_value
+        self.current_holdings['price'] = price
         
         # Calculate total equity
         total_market_value = sum(
@@ -137,6 +140,16 @@ class Portfolio:
             # Cash increases by the fill cost, minus transaction costs
             self.current_cash += (fill_cost - commission - slippage)
 
+        self.trades.append({
+            'timestamp': event.timestamp.timestamp(),
+            'symbol': symbol,
+            'direction': direction,
+            'quantity': quantity,
+            'price': fill_price,
+            'commission': commission,
+            'slippage': slippage
+        })
+
     """
     # POLARS VERSION - DEPRECATED IN FAVOR OF PANDAS DATEFRAME FOR BETTER COMPATIBILITY WITH PYSCRIPT
     def generate_equity_curve(self) -> pl.DataFrame:
@@ -158,4 +171,6 @@ class Portfolio:
         df = pd.DataFrame(self.all_holdings)
         
         # In Pandas, filter columns by passing a list to the indexer
+        if 'price' in df.columns:
+            return df[['timestamp', 'total', 'price']]
         return df[['timestamp', 'total']]
