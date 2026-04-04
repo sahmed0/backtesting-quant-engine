@@ -5,7 +5,7 @@ Data handler module for the backtesting engine.
 from abc import ABC, abstractmethod
 from typing import Dict, Iterator, Any, List
 from queue import Queue
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import csv
 # import polars as pl # deprecating in favor of streaming CSV processing with built-in csv module
@@ -104,9 +104,9 @@ class CSVDataHandler(DataHandler):
                 
                 # Adapts to string or native datetime parsing
                 if isinstance(timestampRaw, str):
-                    timestamp = datetime.fromisoformat(timestampRaw)
+                    timestamp = datetime.fromisoformat(timestampRaw).replace(tzinfo=timezone.utc)
                 else:
-                    timestamp = timestampRaw
+                    timestamp = timestampRaw.replace(tzinfo=timezone.utc)
                 
                 event = MarketEvent(
                     symbol=symbol,
