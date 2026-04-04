@@ -11,7 +11,7 @@ from engine import Backtest
 import performance
 
 async def main_async():
-    # Initialize Queue
+    # Initialise Queue
     events = queue.Queue()
 
     # Set CSV Path
@@ -26,7 +26,7 @@ async def main_async():
     csv_dir = os.path.dirname(csv_path)
     symbol = os.path.splitext(os.path.basename(csv_path))[0]
 
-    # Initialize Components
+    # Initialise Components
     data_handler = CSVDataHandler(events, csv_dir, [symbol])
     strategy = SimpleMovingAverageStrategy(events, short_window=5, long_window=20)
     portfolio = Portfolio(events, initial_capital=100000.0)
