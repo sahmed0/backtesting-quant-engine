@@ -6,3 +6,6 @@
 __pycache__/
 .pytest_cache/
 *.pyc
+
+# to do list for development
+TODO.txt
