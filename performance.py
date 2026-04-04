@@ -29,12 +29,12 @@ def calculate_drawdown(equity_curve: np.ndarray) -> float:
         return 0.0
 
     # Calculate the cumulative maximum peak
-    hwm = np.maximum.accumulate(equity_curve)
+    high_water_mark = np.maximum.accumulate(equity_curve)
     
     # Calculate drawdowns from the high water mark
-    # Suppress warnings for division by zero if hwm has zeros
+    # Suppress warnings for division by zero if high_water_mark has zeros
     with np.errstate(divide='ignore', invalid='ignore'):
-        drawdowns = (hwm - equity_curve) / hwm
+        drawdowns = (high_water_mark - equity_curve) / high_water_mark
         drawdowns[np.isnan(drawdowns)] = 0.0
         drawdowns[np.isinf(drawdowns)] = 0.0
     
