@@ -4,9 +4,11 @@
 [![Python](https://img.shields.io/badge/Python-3.12-yellow)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://opensource.org/licenses/GPL-3.0)
 
-A high-performance, event-driven backtesting engine designed for the modern web. Built with **PyScript** and **Python**, this engine runs entirely in your browser—no backend servers or complex local environments required.
+A high-performance, event-driven backtesting engine designed for the modern web. Built with **PyScript** and **Python**, this engine runs entirely in your browser - no backend servers or complex local environments required.
 
-## 🚀 Key Features & USPs
+## 🖥️ [Click to visit website](https://sajidahmed.co.uk/backtesting-quant-engine/)
+
+## Key Features
 
 - **Event-Driven Core**: Simulates trading workflows using a robust queue-based event system (`Market`, `Signal`, `Order`, `Fill`).
 - **PyScript Powered**: Leverages WebAssembly (Pyodide) to execute original Python code at near-native speeds directly in the browser.
@@ -14,7 +16,11 @@ A high-performance, event-driven backtesting engine designed for the modern web.
 - **Streaming Row Processing**: Optimized `CSVDataHandler` streams data row-by-row to prevent memory exhaustion and eliminate "Lookahead Bias."
 - **Interactive UI**: Integrated real-time trade logging and dynamic equity curve visualization using modern JavaScript charting.
 
-## 🛠️ System Architecture
+<p align="center">
+  <img src="public/preview.png" alt="Preview" width="700">
+</p>
+
+## System Architecture
 
 ### High-Level System Flow
 
@@ -65,7 +71,7 @@ graph TD
 └── strategies/             # Extensible strategy repository
 ```
 
-## 📊 Performance Metrics
+## Performance Metrics
 
 The engine provides a comprehensive suite of metrics calculated upon backtest completion:
 
@@ -74,7 +80,15 @@ The engine provides a comprehensive suite of metrics calculated upon backtest co
 - **Max Drawdown**: Maximum peak-to-trough decline.
 - **Win Rate**: Percentage of profitable trading periods.
 
-## 🚦 Getting Started
+<p align="center">
+  <img src="public/chart.png" alt="Trade Executions Chart" width="700">
+</p>
+
+<p align="center">
+  <img src="public/table.png" alt="Executed Trades Order Book Table" width="700">
+</p>
+
+## Getting Started
 
 ### Local Setup (Development)
 
