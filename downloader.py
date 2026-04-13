@@ -10,7 +10,7 @@ from typing import List
 
 def download_data(tickers: List[str], start_date: str, end_date: str, output_dir: str = 'data') -> None:
     """
-    Downloads historical data for the given tickers from yfinance and saves them as CSVs.
+    Downloads historical data for the given tickers and saves them as CSVs.
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -30,7 +30,7 @@ def download_data(tickers: List[str], start_date: str, end_date: str, output_dir
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = [col[0] for col in data.columns]
 
-            available_cols = list(data.columns)
+            available_cols = data.columns.tolist()
             
             # yfinance sometimes doesn't return 'Adj Close', fallback to 'Close' if missing
             close_col_name = 'Adj Close' if 'Adj Close' in available_cols else 'Close'
@@ -67,11 +67,11 @@ def download_data(tickers: List[str], start_date: str, end_date: str, output_dir
             print(f"\nError downloading {ticker}: {e}")
 
 if __name__ == '__main__':
-    # Download data for a sample set of tickers
-    sample_tickers = ['AAPL', 'TSLA', 'BTC-USD', 'GOOG', 'AMZN', 'MSFT', 'META', 'NVDA', 'JPM', 'WMT']
+    # Example usage for testing and validation
+    sample_tickers = ["AAPL", "AMZN", "BTC-USD", "GOOG", "JPM", "META", "MSFT", "NVDA", "TSLA", "WMT"]
     download_data(
         tickers=sample_tickers,
         start_date='2000-01-01',
-        end_date='2026-03-30',
+        end_date='2026-03-31',
         output_dir='data'
     )
