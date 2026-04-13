@@ -153,7 +153,7 @@ async def run_backtest(event):
                     json.dumps(trades)
                 )
                 
-            status_el.innerText = "Backtest complete!"
+            status_el.innerText = "Backtest Complete"
             
     except Exception as e:
         error_output.innerText = f"Error: {str(e)}\n{traceback.format_exc()}"
@@ -171,7 +171,7 @@ def setup():
     btn.addEventListener("click", click_proxy)
     
     status_el = document.getElementById("status")
-    status_el.innerText = "Ready. Select a ticker or upload a CSV file."
+    status_el.innerText = "Engine Ready"
 
 # Initialise when script loads
 setup()
