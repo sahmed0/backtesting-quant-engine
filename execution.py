@@ -11,8 +11,8 @@ from typing import Any
 from event import OrderEvent, FillEvent
 from data import DataHandler
 
-# Configure basic logging for the console
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Configure console logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
 class ExecutionHandler(ABC):
@@ -52,7 +52,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
         latest_bar = self.dataHandler.getLatestBar(event.symbol)
         
-        # If no bar data is available, we cannot execute the order realistically in this simulation.
+        # If no bar data is available, we cannot execute the order in this simulation.
         if not latest_bar or 'close' not in latest_bar:
             logger.warning(f"No price data available for {event.symbol}. Cannot execute order.")
             return
@@ -81,7 +81,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # Create FillEvent
         fill_event = FillEvent(
             symbol=event.symbol,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=event.timestamp,
             quantity=event.quantity,
             direction=event.direction,
             fillPrice=fill_price,
@@ -91,7 +91,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
         # Log the fill
         logger.info(
-            f"FILLED {fill_event.direction} {fill_event.quantity} {fill_event.symbol} "
+            f"FILLED {fill_event.timestamp} {fill_event.direction} {fill_event.quantity} {fill_event.symbol} "
             f"@ {fill_event.fillPrice:.4f} (comm: {fill_event.commission}, slippage: {fill_event.slippage:.4f})"
         )
 

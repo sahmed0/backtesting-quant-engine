@@ -3,7 +3,6 @@ Performance metrics and summary statistics for trading portfolios.
 """
 
 import numpy as np
-import polars as pl
 from portfolio import Portfolio
 
 def calculate_sharpe_ratio(returns: np.ndarray, periods: int = 252) -> float:
@@ -41,21 +40,19 @@ def calculate_drawdown(equity_curve: np.ndarray) -> float:
     
     return float(np.max(drawdowns))
 
-def create_summary_stats(portfolio: Portfolio) -> None:
+def create_summary_stats(portfolio: Portfolio) -> dict:
     """
-    Prints a clean, formatted table of: Total Return, Sharpe Ratio, Max Drawdown, and Win Rate.
+    Returns a dictionary of: Total Return, Sharpe Ratio, Max Drawdown, and Win Rate.
     """
     df = portfolio.generate_equity_curve()
     
-    if df.is_empty():
-        print("Portfolio is empty. No performance stats to calculate.")
-        return
+    if df.empty:
+        return {"error": "Portfolio is empty. No performance stats to calculate."}
         
     equity_curve = df['total'].to_numpy()
     
     if len(equity_curve) < 2:
-        print("Insufficient data points in portfolio to calculate performance stats.")
-        return
+        return {"error": "Insufficient data points in portfolio to calculate performance stats."}
         
     initial_capital = portfolio.initial_capital
     final_equity = equity_curve[-1]
@@ -64,7 +61,7 @@ def create_summary_stats(portfolio: Portfolio) -> None:
     total_return = (final_equity / initial_capital) - 1.0
     
     # Calculate returns
-    returns_series = df['total'].pct_change().drop_nulls()
+    returns_series = df['total'].pct_change().dropna()
     returns = returns_series.to_numpy()
     
     # Sharpe Ratio
@@ -80,12 +77,9 @@ def create_summary_stats(portfolio: Portfolio) -> None:
     else:
         win_rate = 0.0
         
-    # CLI Results Formatting
-    print("-" * 40)
-    print("Performance Summary")
-    print("-" * 40)
-    print(f"Total Return: {total_return * 100:.2f}%")
-    print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
-    print(f"Max Drawdown: {max_drawdown * 100:.2f}%")
-    print(f"Win Rate:     {win_rate * 100:.2f}%")
-    print("-" * 40)
+    return {
+        "total_return": total_return,
+        "sharpe_ratio": sharpe_ratio,
+        "max_drawdown": max_drawdown,
+        "win_rate": win_rate
+    }
