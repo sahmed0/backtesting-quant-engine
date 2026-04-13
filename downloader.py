@@ -68,7 +68,7 @@ def download_data(tickers: List[str], start_date: str, end_date: str, output_dir
 
 if __name__ == '__main__':
     # Example usage for testing and validation
-    sample_tickers = ["AAPL", "AMZN", "BTC-USD", "GOOG", "JPM", "META", "MSFT", "NVDA", "TSLA", "WMT"]
+    sample_tickers = ["AAPL", "AMZN", "BTC-USD", "CL=F", "GC=F", "GOOG", "JPM", "META", "MSFT", "NVDA", "TSLA", "WMT"]
     download_data(
         tickers=sample_tickers,
         start_date='2000-01-01',
