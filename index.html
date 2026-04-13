@@ -1,783 +1,986 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <link rel="apple-touch-icon" sizes="180x180" href="public/favicon/apple-touch-icon.png?v=2">
-    <link rel="icon" type="image/png" sizes="32x32" href="public/favicon/favicon-32x32.png?v=2">
-    <link rel="icon" type="image/png" sizes="16x16" href="public/favicon/favicon-16x16.png?v=2">
-    <link rel="manifest" href="public/favicon/site.webmanifest?v=2">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backtesting Engine</title>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css">
-    <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
-    
-    <style>
-        /* --- Modern Variables & Baseline --- */
-        :root {
-            --glass-bg: rgba(255, 255, 255, 0.45);
-            --glass-border: rgba(255, 255, 255, 0.6);
-            --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
-            --text-main: #0f172a;
-            --text-muted: #475569;
-            --accent: #ff0051;
-            --accent-glow: #ff5389;
-            --success: #10b981;
-            --danger: #ef4444;
-        }
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="180x180" href="public/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="public/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="public/favicon/favicon-16x16.png">
+  <link rel="manifest" href="public/favicon/site.webmanifest">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Backtesting Engine | Sajid Ahmed</title>
 
-        body {
-            font-family: 'Chakra Petch', sans-serif;
-            margin: 0;
-            padding: 2vw;
-            min-height: 100vh;
-            color: var(--text-main);
-            /* Modern Mesh Gradient Background */
-            background-color: #e0f3ff;
-            background-image: 
-                radial-gradient(at 40% 20%, hsla(190,100%,80%,1) 0px, transparent 50%),
-                radial-gradient(at 80% 0%, hsla(280,100%,85%,1) 0px, transparent 50%),
-                radial-gradient(at 0% 50%, hsla(330,100%,85%,1) 0px, transparent 50%),
-                radial-gradient(at 80% 50%, hsla(160,100%,85%,1) 0px, transparent 50%),
-                radial-gradient(at 0% 100%, hsla(220,100%,85%,1) 0px, transparent 50%);
-            background-attachment: fixed;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-        /* --- Typography --- */
-        h1 {
-            font-size: clamp(2rem, 4vw, 3rem);
-            margin: 0 0 0.5rem 0;
-            line-height: 1.1;
-            background: linear-gradient(135deg, #1e293b, #000);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+  <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css">
+  <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
 
-        h2 {
-            font-size: clamp(1.5rem, 2.5vw, 2rem);
-            margin: 0 0 1.5rem 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+  <style>
+    /* --- Modern Variables & Baseline --- */
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.45);
+      --glass-border: rgba(255, 255, 255, 0.6);
+      --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --accent: #ff0051;
+      --accent-glow: #ff5389;
+      --success: #10b981;
+      --danger: #ef4444;
+      --bg-color: #e0f3ff;
+    }
 
-        p {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-            line-height: 1.6;
-            margin-bottom: 1.5rem;
-        }
+    body {
+      font-family: 'Chakra Petch', sans-serif;
+      margin: 0;
+      padding: 2vw;
+      min-height: 100vh;
+      color: var(--text-main);
+      /* Modern Mesh Gradient Background */
+      background-color: #e0f3ff;
+      background-image:
+        radial-gradient(at 40% 20%, hsla(190, 100%, 80%, 1) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, hsla(280, 100%, 85%, 1) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, hsla(330, 100%, 85%, 1) 0px, transparent 50%),
+        radial-gradient(at 80% 50%, hsla(160, 100%, 85%, 1) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, hsla(220, 100%, 85%, 1) 0px, transparent 50%);
+      background-attachment: fixed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
 
-        /* --- Layout Grid --- */
-        .dashboard-container {
-            width: 100%;
-            max-width: 1600px;
-            display: grid;
-            grid-template-columns: 380px 1fr;
-            gap: 24px;
-            flex-grow: 1;
-            margin-bottom: 30px;
-        }
+    canvas {
+      max-width: 95vw !important;
+      max-height: 100vh !important;
+      width: 100% !important;
+      height: 100% !important;
+    }
 
-        /* --- Glassmorphism Cards 2.0 --- */
-        .glass-card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--glass-border);
-            border-radius: 24px;
-            padding: 30px;
-            box-shadow: var(--glass-shadow), var(--glass-highlight);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
+    .main-content {
+      max-width: 95vw !important;
+      max-height: 100% !important;
+      width: 100% !important;
+      height: 100% !important;
+    }
 
-        .glass-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: -100%; width: 50%; height: 100%;
-            background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
-            transform: skewX(-25deg);
-            transition: all 0.75s;
-        }
+    /* --- Typography --- */
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      margin: 0 0 0.5rem 0;
+      line-height: 1.1;
+      background: linear-gradient(135deg, #1e293b, #000);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
 
-        .glass-card:hover::before {
-            left: 200%;
-        }
+    h2 {
+      font-size: clamp(1.3rem, 2.5vw, 2rem);
+      margin: 0 0 1rem 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
-        /* --- Sidebar & Inputs --- */
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
+    p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+    }
 
-        .input-group {
-            background: rgba(255, 255, 255, 0.5);
-            padding: 20px;
-            border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.8);
-        }
+    /* --- Layout Grid --- */
+    .dashboard-container {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 350px 1fr;
+      gap: 20px;
+      flex-grow: 1;
+      margin-bottom: 20px;
+    }
 
-        label {
-            font-weight: 600;
-            color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
+    /* --- UI Panel / Card --- */
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: var(--glass-shadow), var(--glass-highlight);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
 
-        select, input[type="file"] {
-            width: 100%;
-            padding: 12px;
-            border-radius: 10px;
-            border: 1px solid rgba(0,0,0,0.1);
-            background: rgba(255, 255, 255, 0.8);
-            font-family: inherit;
-            font-size: 1rem;
-            color: var(--text-main);
-            transition: all 0.2s;
-            box-sizing: border-box;
-        }
+    .glass-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0) 100%);
+      transform: skewX(-25deg);
+      transition: all 0.75s;
+    }
 
-        select:focus, input[type="file"]:focus {
-            outline: none;
-            border-color: var(--accent-glow);
-            box-shadow: 0 0 0 3px rgba(255, 83, 137, 0.2);
-        }
+    .glass-card:hover::before {
+      left: 200%;
+    }
 
-        /* Drag & Drop Style File Input */
-        .file-upload-wrapper {
-            position: relative;
-            border: 2px dashed rgba(0,0,0,0.2);
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            background: rgba(255,255,255,0.3);
-            transition: all 0.2s;
-        }
+    /* --- Sidebar & Inputs --- */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
 
-        .file-upload-wrapper:hover {
-            border-color: var(--accent-glow);
-            background: rgba(255, 83, 137, 0.05);
-        }
+    .input-group {
+      background: rgba(255, 255, 255, 0.5);
+      padding: 15px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.8);
+    }
 
-        .file-upload-wrapper input[type="file"] {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            opacity: 0;
-            cursor: pointer;
-        }
+    label {
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
 
-        /* --- Buttons --- */
-        button {
-            background: linear-gradient(135deg, var(--accent-glow) 0%, var(--accent) 100%);
-            color: white;
-            padding: 16px 24px;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: 1.2rem;
-            font-weight: 700;
-            font-family: inherit;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(255, 0, 81, 0.3);
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-        }
+    select,
+    input[type="file"] {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      background: rgba(255, 255, 255, 0.8);
+      font-family: inherit;
+      font-size: 1rem;
+      color: var(--text-main);
+      transition: all 0.2s;
+      box-sizing: border-box;
+      cursor: pointer;
+      /* optimise for mobile displays */
+      min-height: 48px;
+      /* better touch target */
+    }
 
-        button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255, 0, 81, 0.4);
-        }
+    select:focus,
+    input[type="file"]:focus {
+      outline: none;
+      border-color: var(--accent-glow);
+      box-shadow: 0 0 0 3px rgba(255, 83, 137, 0.2);
+    }
 
-        button:disabled {
-            background: #cbd5e1;
-            color: #94a3b8;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
+    /* Drag & Drop Style File Input */
+    .file-upload-wrapper {
+      position: relative;
+      border: 2px dashed rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      padding: 25px 15px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.3);
+      transition: all 0.2s;
+    }
 
-        .btn-clear {
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--danger);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            padding: 8px;
-            width: auto;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            box-shadow: none;
-            margin-top: 10px;
-        }
+    .file-upload-wrapper:hover {
+      border-color: var(--accent-glow);
+      background: rgba(255, 83, 137, 0.05);
+    }
 
-        .btn-clear:hover {
-            background: var(--danger);
-            color: white;
-        }
+    .file-upload-wrapper input[type="file"] {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
 
-        /* --- Dynamic Status Loader --- */
-        #status {
-            margin-top: 15px;
-            font-weight: 600;
-            color: var(--accent-glow);
-            font-size: 0.95rem;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
+    /* --- Buttons --- */
+    button {
+      background: linear-gradient(135deg, var(--accent-glow) 0%, var(--accent) 100%);
+      color: white;
+      padding: 16px 20px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: inherit;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(255, 0, 81, 0.3);
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      /* touch target */
+    }
 
-        .pulse {
-            width: 8px;
-            height: 8px;
-            background-color: var(--accent-glow);
-            border-radius: 50%;
-            animation: pulse-anim 1.5s infinite;
-        }
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(255, 0, 81, 0.4);
+    }
 
-        @keyframes pulse-anim {
-            0% { box-shadow: 0 0 0 0 rgba(255, 83, 137, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(255, 83, 137, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 83, 137, 0); }
-        }
+    button:disabled {
+      background: #cbd5e1;
+      color: #94a3b8;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
 
-        /* --- Metrics Grid --- */
-        .metrics-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
+    .btn-clear {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 10px;
+      width: auto;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      box-shadow: none;
+      margin-top: 10px;
+      min-height: 44px;
+    }
 
-        .metric-box {
-            background: rgba(255, 255, 255, 0.6);
-            padding: 24px;
-            border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.9);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
+    .btn-clear:hover {
+      background: var(--danger);
+      color: white;
+    }
 
-        .metric-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 600;
-        }
+    /* --- Dynamic Status Loader --- */
+    #status {
+      margin-top: 15px;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: var(--accent-glow);
+      font-size: 1.4rem;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
 
-        .metric-value {
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: var(--text-main);
-        }
+    .pulse {
+      width: 12px;
+      height: 12px;
+      background-color: var(--accent-glow);
+      border-radius: 50%;
+      animation: pulse-anim 1.5s infinite;
+    }
 
-        /* Dynamic Colors applied via JS */
-        .text-success { color: var(--success); }
-        .text-danger { color: var(--danger); }
+    @keyframes pulse-anim {
+      0% {
+        box-shadow: 0 0 0 0 rgba(255, 83, 137, 0.7);
+      }
 
-        /* --- Charts & Tables --- */
-        .chart-wrapper {
-            height: 400px;
-            width: 100%;
-            position: relative;
-            margin-bottom: 40px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 16px;
-            padding: 15px;
-            box-sizing: border-box;
-        }
+      70% {
+        box-shadow: 0 0 0 10px rgba(255, 83, 137, 0);
+      }
 
-        .table-container {
-            overflow-x: auto;
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.5);
-            border: 1px solid rgba(255,255,255,0.8);
-            max-height: 400px;
-        }
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 83, 137, 0);
+      }
+    }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.95rem;
-            text-align: left;
-        }
+    /* --- Metrics Grid --- */
+    .metrics-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
 
-        th {
-            background: rgba(255, 255, 255, 0.9);
-            color: var(--text-muted);
-            padding: 16px;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.8rem;
-            letter-spacing: 1px;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
+    .metric-box {
+      background: rgba(255, 255, 255, 0.6);
+      padding: 15px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
 
-        td {
-            padding: 14px 16px;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
 
-        tr:hover { background: rgba(255, 255, 255, 0.4); }
-        
-        .dir-long { color: var(--success); font-weight: 700; }
-        .dir-short, .dir-exit { color: var(--danger); font-weight: 700; }
+    .metric-value {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 700;
+      color: var(--text-main);
+    }
 
-        .reset-zoom-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: auto;
-            padding: 8px 16px;
-            font-size: 0.85rem;
-            background: rgba(255,255,255,0.9);
-            color: var(--text-main);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            display: none;
-            z-index: 10;
-        }
+    /* Dynamic Colors applied via JS */
+    .text-success {
+      color: var(--success) !important;
+    }
 
-        /* --- Footer & Socials --- */
-        footer {
-            width: 100%;
-            max-width: 1600px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            box-sizing: border-box;
-        }
+    .text-danger {
+      color: var(--danger) !important;
+    }
 
-        .social-icons {
-            display: flex;
-            gap: 15px;
-        }
+    /* --- Charts & Tables --- */
+    .chart-wrapper {
+      height: 600px;
+      width: 100%;
+      max-height: 50vh;
+      position: relative;
+      margin-bottom: 30px;
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 16px;
+      padding: 15px;
+      box-sizing: border-box;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      overflow: hidden;
+      /* Prevents internal canvas from pushing boundaries */
+    }
 
-        .social-icons a {
-            color: var(--text-muted);
-            font-size: 1.5rem;
-            transition: all 0.3s;
-        }
+    /* Fullscreen overrides */
+    .chart-wrapper:fullscreen,
+    .chart-wrapper:-webkit-full-screen {
+      background: var(--bg-color);
+      padding: 5vw 5vh;
+      height: 100vh;
+      width: 100vw;
+      border-radius: 0;
+      border: none;
+    }
 
-        .social-icons a:hover {
-            color: var(--accent);
-            transform: translateY(-3px);
-        }
+    .chart-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
 
-        /* --- Responsive Design --- */
-        @media (max-width: 1024px) {
-            .dashboard-container { grid-template-columns: 1fr; }
-            .sidebar { flex-direction: row; flex-wrap: wrap; }
-            .sidebar > * { flex: 1 1 300px; }
-            .glass-card { padding: 20px; }
-        }
+    .action-btn {
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--text-main);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      min-height: 40px;
+      width: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-        @media (max-width: 600px) {
-            .metrics-container { grid-template-columns: 1fr 1fr; }
-            .chart-wrapper { height: 300px; }
-            footer { flex-direction: column; gap: 15px; text-align: center; }
-            h1 { font-size: 2.2rem; }
-        }
-    </style>
+    .action-btn:hover {
+      background: #fff;
+    }
+
+    .action-btn.reset-zoom {
+      display: none;
+    }
+
+    /* Hidden by default */
+
+    .table-container {
+      overflow-x: auto;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      max-height: 50vh;
+      -webkit-overflow-scrolling: touch;
+      /* smooth mobile scroll */
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 95vw;
+      font-size: 0.9rem;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--text-muted);
+      padding: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    tr:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .dir-long {
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .dir-short,
+    .dir-exit {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .reset-zoom-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: auto;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--text-main);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      display: none;
+      z-index: 10;
+    }
+
+    /* --- Footer & Socials --- */
+    footer {
+      width: 100%;
+      max-height: fit-content;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 25px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+      box-sizing: border-box;
+    }
+
+    .social-icons {
+      display: flex;
+      gap: 15px;
+    }
+
+    .social-icons a {
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      transition: all 0.3s;
+    }
+
+    .social-icons a:hover {
+      color: var(--accent);
+      transform: translateY(-3px);
+    }
+
+    /* --- Responsive Design --- */
+    @media (max-width: 1024px) {
+      .dashboard-container {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+
+      .sidebar>* {
+        flex: 1 1 300px;
+      }
+
+      .glass-card {
+        padding: 20px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 3vw;
+      }
+
+      .glass-card {
+        padding: 15px;
+      }
+
+      .metrics-container {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .chart-wrapper {
+        height: 350px;
+      }
+
+      footer {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 2.2rem;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-    <div class="dashboard-container">
-        
-        <div class="sidebar">
-            <div class="glass-card">
-                <h1>QuantEngine</h1>
-                <p>ARIMA Trading Strategy Backtester.</p>
-                <div class="social-icons" style="margin-bottom: 20px;">
-                    <a href="https://github.com/sahmed0" target="_blank" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
-                    <a href="https://linkedin.com/in/s-ahmed1" target="_blank" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
-                </div>
+  <div class="dashboard-container">
 
-                <div class="input-group">
-                    <label for="ticker-select"><i class="fa-solid fa-list"></i> Pre-loaded Ticker</label>
-                    <select id="ticker-select">
-                        <option value="">-- Select an Asset --</option>
-                        <option value="AAPL">AAPL (Apple Inc.)</option>
-                        <option value="AMZN">AMZN (Amazon Inc.)</option>
-                        <option value="BTC-USD">BTC-USD (Bitcoin)</option>
-                        <option value="GOOG">GOOG (Alphabet Inc.)</option>
-                        <option value="JPM">JPM (JPMorgan Chase)</option>
-                        <option value="META">META (Meta Platforms Inc.)</option>
-                        <option value="MSFT">MSFT (Microsoft Corp.)</option>
-                        <option value="NVDA">NVDA (NVIDIA Corp.)</option>
-                        <option value="TSLA">TSLA (Tesla Inc.)</option>
-                        <option value="WMT">WMT (Walmart Inc.)</option>
-                    </select>
-                </div>
-
-                <div class="input-group" style="margin-top: 15px;">
-                    <label for="csv-upload"><i class="fa-solid fa-file-csv"></i> Custom CSV Data</label>
-                    <div class="file-upload-wrapper">
-                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; color: #a0aec0; margin-bottom: 10px;"></i>
-                        <div style="font-size: 0.9rem; color: #475569;">Drag & drop or click to upload</div>
-                        <input type="file" id="csv-upload" accept=".csv">
-                    </div>
-                    <button id="clear-upload" class="btn-clear" style="display: none;"><i class="fa-solid fa-trash"></i> Remove File</button>
-                </div>
-
-                <button id="run-btn" disabled style="margin-top: 25px;">
-                    <i class="fa-solid fa-play"></i> Execute Backtest
-                </button>
-                
-                <div id="status">
-                    <div class="pulse"></div>
-                    Initialising Python Environment...
-                </div>
-            </div>
+    <div class="sidebar">
+      <div class="glass-card">
+        <h1>QuantEngine</h1>
+        <p>Autoregressive Integrated Moving Average Trading Strategy Backtesting Engine. <br>Ornstein-Uhlenbeck Mean
+          Reversion Strategy Under Development</p>
+        <div class="social-icons" style="margin-bottom: 20px;">
+          <a href="https://github.com/sahmed0" target="_blank" aria-label="GitHub"><i
+              class="fa-brands fa-github"></i></a>
+          <a href="https://linkedin.com/in/s-ahmed1" target="_blank" aria-label="LinkedIn"><i
+              class="fa-brands fa-linkedin"></i></a>
         </div>
 
-        <div class="main-content">
-            
-            <div class="glass-card">
-                <h2><i class="fa-solid fa-chart-pie"></i> Performance Summary</h2>
-                
-                <div id="results" class="metrics-container">
-                    <div class="metric-box">
-                        <div class="metric-header"><span>Total Return</span> <i class="fa-solid fa-money-bill-trend-up"></i></div>
-                        <div class="metric-value" id="val-return">-</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-header"><span>Sharpe Ratio</span> <i class="fa-solid fa-scale-balanced"></i></div>
-                        <div class="metric-value" id="val-sharpe">-</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-header"><span>Max Drawdown</span> <i class="fa-solid fa-arrow-trend-down"></i></div>
-                        <div class="metric-value" id="val-drawdown">-</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-header"><span>Win Rate</span> <i class="fa-solid fa-bullseye"></i></div>
-                        <div class="metric-value" id="val-winrate">-</div>
-                    </div>
-                </div>
-
-                <div id="error-output" style="color: var(--danger); margin-bottom: 15px; font-weight: 600;"></div>
-
-                <div id="charts-card" style="display: none;">
-                    <h2><i class="fa-solid fa-chart-line"></i> Equity Curve</h2>
-                    <div class="chart-wrapper">
-                        <button id="resetEquityZoom" class="reset-zoom-btn"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset</button>
-                        <canvas id="equityChart"></canvas>
-                    </div>
-
-                    <h2><i class="fa-solid fa-candlestick-chart"></i> Asset Price & Executions</h2>
-                    <div class="chart-wrapper">
-                        <button id="resetPriceZoom" class="reset-zoom-btn"><i class="fa-solid fa-magnifying-glass-minus"></i> Reset</button>
-                        <canvas id="priceChart"></canvas>
-                    </div>
-
-                    <h2 style="margin-top: 30px;"><i class="fa-solid fa-book"></i> Order Book</h2>
-                    <div class="table-container">
-                        <table id="order-table">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Side</th>
-                                    <th>Qty</th>
-                                    <th>Ticker</th>
-                                    <th>Price ($)</th>
-                                    <th>Commission</th>
-                                    <th>Slippage</th>
-                                </tr>
-                            </thead>
-                            <tbody id="order-log-body">
-                                </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            
+        <div id="status">
+          <div class="pulse"></div> Initialising Engine
         </div>
+
+        <div class="input-group">
+          <label for="ticker-select"><i class="fa-solid fa-list"></i> Pre-loaded Ticker</label>
+          <select id="ticker-select">
+            <option value="">-- Select a Ticker --</option>
+            <option value="AAPL">AAPL (Apple Inc.)</option>
+            <option value="AMZN">AMZN (Amazon Inc.)</option>
+            <option value="BTC-USD">BTC-USD (Bitcoin)</option>
+            <option value="GOOG">GOOG (Alphabet Inc.)</option>
+            <option value="JPM">JPM (JPMorgan Chase)</option>
+            <option value="META">META (Meta Platforms Inc.)</option>
+            <option value="MSFT">MSFT (Microsoft Corp.)</option>
+            <option value="NVDA">NVDA (NVIDIA Corp.)</option>
+            <option value="TSLA">TSLA (Tesla Inc.)</option>
+            <option value="WMT">WMT (Walmart Inc.)</option>
+          </select>
+        </div>
+
+        <div class="input-group" style="margin-top: 15px;">
+          <label for="csv-upload"><i class="fa-solid fa-file-csv"></i> Custom CSV Data</label>
+          <div class="file-upload-wrapper">
+            <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; color: #a0aec0; margin-bottom: 10px;"></i>
+            <div style="font-size: 0.9rem; color: #475569;">Click or Drag & Drop to Upload</div>
+            <input type="file" id="csv-upload" accept=".csv">
+          </div>
+          <button id="clear-upload" class="btn-clear" style="display: none;"><i class="fa-solid fa-trash"></i> Remove
+            File</button>
+        </div>
+
+        <button id="run-btn" disabled style="margin-top: 25px;">
+          <i class="fa-solid fa-play"></i> Execute Backtest
+        </button>
+      </div>
     </div>
 
-    <footer>
-        <div style="font-size: 0.9rem; color: var(--text-muted);">
-            <strong>Sajid Ahmed 2026</strong> • Licensed under GNU GPL v3.0
+    <div class="main-content">
+
+      <div class="glass-card">
+        <h2><i class="fa-solid fa-chart-pie"></i> Performance</h2>
+
+        <div id="results" class="metrics-container">
+          <div class="metric-box">
+            <div class="metric-header"><span>Total Return</span> <i class="fa-solid fa-money-bill-trend-up"></i></div>
+            <div class="metric-value" id="val-return">-</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-header"><span>Sharpe Ratio</span> <i class="fa-solid fa-scale-balanced"></i></div>
+            <div class="metric-value" id="val-sharpe">-</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-header"><span>Max Drawdown</span> <i class="fa-solid fa-arrow-trend-down"></i></div>
+            <div class="metric-value" id="val-drawdown">-</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-header"><span>Win Rate</span> <i class="fa-solid fa-bullseye"></i></div>
+            <div class="metric-value" id="val-winrate">-</div>
+          </div>
         </div>
-        <div class="social-icons">
-            <a href="https://github.com/sahmed0" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
-            <a href="https://linkedin.com/in/s-ahmed1" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
+
+        <div id="error-output" style="color: var(--danger); margin-bottom: 15px; font-weight: 600;"></div>
+
+        <div id="charts-card" style="display: none;">
+          <h2><i class="fa-solid fa-chart-line"></i> Portfolio Equity</h2>
+          <div class="chart-wrapper" id="wrap-equity">
+            <div class="chart-controls">
+              <button id="resetEquityZoom" class="action-btn reset-zoom"><i class="fa-solid fa-rotate-left"></i>
+              </button>
+              <button onclick="toggleFullscreen('wrap-equity', this)" class="action-btn"><i
+                  class="fa-solid fa-expand"></i></button>
+            </div>
+            <canvas id="equityChart"></canvas>
+          </div>
+
+          <h2><i class="fa-solid fa-chart-line"></i> Asset Price & Executions</h2>
+          <div class="chart-wrapper" id="wrap-price">
+            <div class="chart-controls">
+              <button id="resetPriceZoom" class="action-btn reset-zoom"><i class="fa-solid fa-rotate-left"></i></button>
+              <button onclick="toggleFullscreen('wrap-price', this)" class="action-btn"><i
+                  class="fa-solid fa-expand"></i></button>
+            </div>
+            <canvas id="priceChart"></canvas>
+          </div>
+
+          <h2 style="margin-top: 30px;"><i class="fa-solid fa-book"></i> Order Book</h2>
+          <div class="table-container">
+            <table id="order-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Side</th>
+                  <th>Qty</th>
+                  <th>Ticker</th>
+                  <th>Price ($)</th>
+                  <th>Commission</th>
+                  <th>Slippage</th>
+                </tr>
+              </thead>
+              <tbody id="order-log-body">
+              </tbody>
+            </table>
+          </div>
         </div>
-    </footer>
+      </div>
 
-    <py-config>
-        packages = ["numpy", "pandas", "tqdm"]
-        [[fetch]]
-        files = [
-            "./data.py", 
-            "./strategy.py", 
-            "./portfolio.py", 
-            "./execution.py", 
-            "./engine.py", 
-            "./event.py",
-            "./performance.py",
-            "./web_main.py"
-        ]
-        [[fetch]]
-        from = "data"
-        files = ["AAPL.csv", "AMZN.csv", "BTC-USD.csv", "GOOG.csv", "JPM.csv", "META.csv", "MSFT.csv", "NVDA.csv", "TSLA.csv", "WMT.csv"]
-        to_folder = "/data"
-    </py-config>
+    </div>
+  </div>
 
-    <script type="py" src="./web_main.py"></script>
+  <footer>
+    <div style="font-size: 0.9rem; color: var(--text-muted);">
+      <strong>Sajid Ahmed 2026</strong> • Licensed under GNU GPL v3.0
+    </div>
+    <div class="social-icons">
+      <a href="https://github.com/sahmed0" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+      <a href="https://linkedin.com/in/s-ahmed1" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
+    </div>
+  </footer>
 
-    <script>
-        // --- UI State Management ---
-        const csvUpload = document.getElementById('csv-upload');
-        const tickerSelect = document.getElementById('ticker-select');
-        const clearBtn = document.getElementById('clear-upload');
-        const runBtn = document.getElementById('run-btn');
-        const statusDiv = document.getElementById('status');
+  <py-config>
+    packages = ["numpy", "pandas", "tqdm"]
+    [[fetch]]
+    files = [
+    "./data.py",
+    "./strategy.py",
+    "./portfolio.py",
+    "./execution.py",
+    "./engine.py",
+    "./event.py",
+    "./performance.py",
+    "./web_main.py"
+    ]
+    [[fetch]]
+    from = "data"
+    files = ["AAPL.csv", "AMZN.csv", "BTC-USD.csv", "GOOG.csv", "JPM.csv", "META.csv", "MSFT.csv", "NVDA.csv",
+    "TSLA.csv", "WMT.csv"]
+    to_folder = "/data"
+  </py-config>
 
-        // Global Chart.js Font override to match Theme
-        Chart.defaults.font.family = "'Chakra Petch', sans-serif";
-        Chart.defaults.color = '#475569';
+  <script type="py" src="./web_main.py"></script>
 
-        function updateUIState() {
-            const hasUpload = csvUpload.files.length > 0;
-            const hasSelection = tickerSelect.value !== "";
+  <script>
+    // --- Fullscreen & Mobile Optimisation Logic ---
+    async function toggleFullscreen(wrapperId, btnElement) {
+      const wrapper = document.getElementById(wrapperId);
+      const icon = btnElement.querySelector('i');
 
-            if (hasUpload) {
-                tickerSelect.disabled = true;
-                clearBtn.style.display = 'block';
-                runBtn.disabled = false;
-            } else {
-                tickerSelect.disabled = false;
-                clearBtn.style.display = 'none';
-                runBtn.disabled = !hasSelection;
-            }
-            
-            if (runBtn.innerText.includes('Running')) {
-                runBtn.disabled = true;
-            }
+      if (!document.fullscreenElement) {
+        try {
+          await wrapper.requestFullscreen();
+          icon.classList.replace('fa-expand', 'fa-compress');
+          // Force Landscape on mobile if supported
+          if (screen.orientation && screen.orientation.lock) {
+            try { await screen.orientation.lock('landscape'); } catch (e) { console.log('Orientation lock unavailable'); }
+          }
+        } catch (err) {
+          console.error(`Error entering fullscreen: ${err.message}`);
         }
+      } else {
+        document.exitFullscreen();
+      }
+    }
 
-        csvUpload.addEventListener('change', updateUIState);
-        tickerSelect.addEventListener('change', updateUIState);
-        
-        clearBtn.addEventListener('click', function() {
-            csvUpload.value = '';
-            updateUIState();
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        // 1. Reset icons
+        document.querySelectorAll('.fa-compress').forEach(icon => {
+          icon.classList.replace('fa-compress', 'fa-expand');
         });
 
-        // --- Chart Generation Logic ---
-        let equityChartInstance = null;
-        let priceChartInstance = null;
-
-        // Helper to color code text elements based on positive/negative values
-        function formatMetricColor(elementId, valueStr) {
-            const el = document.getElementById(elementId);
-            const val = parseFloat(valueStr.replace(/[^0-9.-]+/g,""));
-            if (val > 0) {
-                el.className = 'metric-value text-success';
-            } else if (val < 0) {
-                el.className = 'metric-value text-danger';
-            } else {
-                el.className = 'metric-value';
-            }
+        // 2. Unlock orientation
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
         }
 
-        window.updateCharts = function(timestampsJSON, equityJSON, pricesJSON, tradesJSON) {
-            document.getElementById('charts-card').style.display = 'block';
-            statusDiv.innerHTML = '<i class="fa-solid fa-check text-success"></i> Analysis Complete';
+        // 3. Force Chart.js to snap back to the restored container size
+        // Add a small delay so the DOM has time to recalculate the wrapper's width first
+        setTimeout(() => {
+          if (equityChartInstance) {
+            equityChartInstance.resize();
+            equityChartInstance.update('none'); // 'none' skips animation for a clean snap
+          }
+          if (priceChartInstance) {
+            priceChartInstance.resize();
+            priceChartInstance.update('none');
+          }
+        }, 100);
+      }
+    });
 
-            const timestamps = JSON.parse(timestampsJSON);
-            const equity = JSON.parse(equityJSON);
-            const prices = JSON.parse(pricesJSON);
-            const trades = JSON.parse(tradesJSON);
+    // --- UI State Management ---
+    const csvUpload = document.getElementById('csv-upload');
+    const tickerSelect = document.getElementById('ticker-select');
+    const clearBtn = document.getElementById('clear-upload');
+    const runBtn = document.getElementById('run-btn');
+    const statusDiv = document.getElementById('status');
 
-            // Dynamically check metrics to apply color coding
-            formatMetricColor('val-return', document.getElementById('val-return').innerText);
-            
-            const labels = timestamps.map(ts => new Date(ts * 1000).toLocaleDateString(undefined, {
-                year: 'numeric', month: 'short', day: 'numeric'
-            }));
+    // Global Chart.js Font override to match Theme
+    Chart.defaults.font.family = "'Chakra Petch', sans-serif";
+    Chart.defaults.color = '#475569';
 
-            const buyData = [];
-            const sellData = [];
+    function updateUIState() {
+      const hasUpload = csvUpload.files.length > 0;
+      const hasSelection = tickerSelect.value !== "";
 
-            trades.forEach(trade => {
-                const dateStr = new Date(trade.timestamp * 1000).toLocaleDateString(undefined, {
-                    year: 'numeric', month: 'short', day: 'numeric'
-                });
-                if (trade.direction === 'LONG') {
-                    buyData.push({ x: dateStr, y: trade.price, quantity: trade.quantity });
-                } else if (trade.direction === 'SHORT' || trade.direction === 'EXIT') {
-                    sellData.push({ x: dateStr, y: trade.price, quantity: trade.quantity });
+      if (hasUpload) {
+        tickerSelect.disabled = true;
+        clearBtn.style.display = 'flex';
+        runBtn.disabled = false;
+      } else {
+        tickerSelect.disabled = false;
+        clearBtn.style.display = 'none';
+        runBtn.disabled = !hasSelection;
+      }
+
+      if (runBtn.innerText.includes('Running')) {
+        runBtn.disabled = true;
+      }
+    }
+
+    csvUpload.addEventListener('change', updateUIState);
+    tickerSelect.addEventListener('change', updateUIState);
+
+    clearBtn.addEventListener('click', function () {
+      csvUpload.value = '';
+      updateUIState();
+    });
+
+    // --- Chart Generation Logic ---
+    let equityChartInstance = null;
+    let priceChartInstance = null;
+
+    // Helper to colour code text elements based on positive/negative values
+    function formatMetricColor(elementId, valueStr) {
+      const el = document.getElementById(elementId);
+      const val = parseFloat(valueStr.replace(/[^0-9.-]+/g, ""));
+      if (val > 0) {
+        el.className = 'metric-value text-success';
+      } else if (val < 0) {
+        el.className = 'metric-value text-danger';
+      } else {
+        el.className = 'metric-value';
+      }
+    }
+
+    window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJSON) {
+      document.getElementById('charts-card').style.display = 'block';
+      statusDiv.innerHTML = '<i class="fa-solid fa-check text-success"></i>';
+
+      const timestamps = JSON.parse(timestampsJSON);
+      const equity = JSON.parse(equityJSON);
+      const prices = JSON.parse(pricesJSON);
+      const trades = JSON.parse(tradesJSON);
+
+      // Dynamically check metrics to apply color coding
+      formatMetricColor('val-return', document.getElementById('val-return').innerText);
+
+      const labels = timestamps.map(ts => new Date(ts * 1000).toLocaleDateString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric'
+      }));
+
+      const buyData = [];
+      const sellData = [];
+
+      trades.forEach(trade => {
+        const dateStr = new Date(trade.timestamp * 1000).toLocaleDateString(undefined, {
+          year: 'numeric', month: 'short', day: 'numeric'
+        });
+        if (trade.direction === 'LONG') {
+          buyData.push({ x: dateStr, y: trade.price, quantity: trade.quantity });
+        } else if (trade.direction === 'SHORT' || trade.direction === 'EXIT') {
+          sellData.push({ x: dateStr, y: trade.price, quantity: trade.quantity });
+        }
+      });
+
+      // --- 1. Equity Chart with Canvas Gradient ---
+      const ctxEquity = document.getElementById('equityChart').getContext('2d');
+
+      // Create Gradient for area under the curve
+      let equityGradient = ctxEquity.createLinearGradient(0, 0, 0, 400);
+      equityGradient.addColorStop(0, 'rgba(255, 83, 137, 0.4)');
+      equityGradient.addColorStop(1, 'rgba(255, 83, 137, 0.0)');
+
+      if (equityChartInstance) equityChartInstance.destroy();
+      equityChartInstance = new Chart(ctxEquity, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Portfolio Equity ($)',
+            data: equity,
+            borderColor: '#ff0051',
+            backgroundColor: equityGradient,
+            borderWidth: 2,
+            fill: true,
+            pointRadius: 0,
+            pointHoverRadius: 8,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: true },
+            zoom: {
+              pan: {
+                enabled: true, mode: 'x',
+                onPanStart: () => { document.getElementById('resetEquityZoom').style.display = 'flex'; }
+              },
+              zoom: {
+                wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x',
+                onZoomStart: () => { document.getElementById('resetEquityZoom').style.display = 'flex'; }
+              }
+            }
+          },
+          scales: {
+            x: { display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+            y: { display: true, border: { dash: [4, 4] }, grid: { color: 'rgba(0,0,0,0.05)' } }
+          }
+        }
+      });
+
+      document.getElementById('resetEquityZoom').onclick = () => {
+        equityChartInstance.resetZoom();
+        document.getElementById('resetEquityZoom').style.display = 'none';
+      };
+
+      // --- 2. Price Chart ---
+      const ctxPrice = document.getElementById('priceChart').getContext('2d');
+      if (priceChartInstance) priceChartInstance.destroy();
+      priceChartInstance = new Chart(ctxPrice, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              type: 'line',
+              label: 'Asset Price ($)',
+              data: prices,
+              borderColor: '#334155',
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 8,
+              fill: false,
+              order: 2,
+              tension: 0.1
+            },
+            {
+              type: 'scatter',
+              label: 'Buy Signal',
+              data: buyData,
+              backgroundColor: '#10b981',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              pointStyle: 'circle',
+              pointRadius: 10,
+              order: 1
+            },
+            {
+              type: 'scatter',
+              label: 'Sell/Exit Signal',
+              data: sellData,
+              backgroundColor: '#ef4444',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              pointStyle: 'triangle',
+              rotation: 180,
+              pointRadius: 10,
+              order: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, padding: 10 } },
+            zoom: {
+              pan: {
+                enabled: true, mode: 'x',
+                onPanStart: () => { document.getElementById('resetPriceZoom').style.display = 'flex'; }
+              },
+              zoom: {
+                wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x',
+                onZoomStart: () => { document.getElementById('resetPriceZoom').style.display = 'flex'; }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  if (context.dataset.type === 'scatter') {
+                    const t = context.raw;
+                    return `${context.dataset.label}: $${t.y.toFixed(2)} (Qty: ${t.quantity})`;
+                  }
+                  return `Price: $${context.raw.toFixed(2)}`;
                 }
-            });
+              }
+            }
+          },
+          scales: {
+            x: { display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+            y: { display: true, border: { dash: [4, 4] }, grid: { color: 'rgba(0,0,0,0.05)' } }
+          }
+        }
+      });
 
-            // --- 1. Equity Chart with Canvas Gradient ---
-            const ctxEquity = document.getElementById('equityChart').getContext('2d');
-            
-            // Create Gradient for area under the curve
-            let equityGradient = ctxEquity.createLinearGradient(0, 0, 0, 400);
-            equityGradient.addColorStop(0, 'rgba(255, 83, 137, 0.4)');
-            equityGradient.addColorStop(1, 'rgba(255, 83, 137, 0.0)');
-
-            if (equityChartInstance) equityChartInstance.destroy();
-            equityChartInstance = new Chart(ctxEquity, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Portfolio Equity ($)',
-                        data: equity,
-                        borderColor: '#ff0051',
-                        backgroundColor: equityGradient,
-                        borderWidth: 2,
-                        fill: true,
-                        pointRadius: 0,
-                        pointHoverRadius: 6, // Larger hit target for mobile
-                        tension: 0.3 // Smoother curve
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { display: false }, // Hide legend to save space
-                        zoom: {
-                            pan: {
-                                enabled: true, mode: 'x',
-                                onPanStart: () => { document.getElementById('resetEquityZoom').style.display = 'block'; }
-                            },
-                            zoom: {
-                                wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x',
-                                onZoomStart: () => { document.getElementById('resetEquityZoom').style.display = 'block'; }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: { display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-                        y: { display: true, border: { dash: [4, 4] }, grid: { color: 'rgba(0,0,0,0.05)' } }
-                    }
-                }
-            });
-
-            document.getElementById('resetEquityZoom').onclick = () => {
-                equityChartInstance.resetZoom();
-                document.getElementById('resetEquityZoom').style.display = 'none';
-            };
-
-            // --- 2. Price Chart ---
-            const ctxPrice = document.getElementById('priceChart').getContext('2d');
-            if (priceChartInstance) priceChartInstance.destroy();
-            priceChartInstance = new Chart(ctxPrice, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            type: 'line',
-                            label: 'Asset Price ($)',
-                            data: prices,
-                            borderColor: '#334155',
-                            borderWidth: 2,
-                            pointRadius: 0,
-                            pointHoverRadius: 5,
-                            fill: false,
-                            order: 2,
-                            tension: 0.1
-                        },
-                        {
-                            type: 'scatter',
-                            label: 'Buy Signal',
-                            data: buyData,
-                            backgroundColor: '#10b981',
-                            borderColor: '#ffffff',
-                            borderWidth: 2,
-                            pointStyle: 'triangle',
-                            pointRadius: 8,
-                            order: 1
-                        },
-                        {
-                            type: 'scatter',
-                            label: 'Sell/Exit Signal',
-                            data: sellData,
-                            backgroundColor: '#ef4444',
-                            borderColor: '#ffffff',
-                            borderWidth: 2,
-                            pointStyle: 'triangle',
-                            rotation: 180,
-                            pointRadius: 8,
-                            order: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
-                        zoom: {
-                            pan: {
-                                enabled: true, mode: 'x',
-                                onPanStart: () => { document.getElementById('resetPriceZoom').style.display = 'block'; }
-                            },
-                            zoom: {
-                                wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x',
-                                onZoomStart: () => { document.getElementById('resetPriceZoom').style.display = 'block'; }
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    if (context.dataset.type === 'scatter') {
-                                        const t = context.raw;
-                                        return `${context.dataset.label}: $${t.y.toFixed(2)} (Qty: ${t.quantity})`;
-                                    }
-                                    return `Price: $${context.raw.toFixed(2)}`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: { display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-                        y: { display: true, border: { dash: [4, 4] }, grid: { color: 'rgba(0,0,0,0.05)' } }
-                    }
-                }
-            });
-
-            document.getElementById('resetPriceZoom').onclick = () => {
-                priceChartInstance.resetZoom();
-                document.getElementById('resetPriceZoom').style.display = 'none';
-            };
-        };
-    </script>
+      document.getElementById('resetPriceZoom').onclick = () => {
+        priceChartInstance.resetZoom();
+        document.getElementById('resetPriceZoom').style.display = 'none';
+      };
+    };
+  </script>
 </body>
+
 </html>
