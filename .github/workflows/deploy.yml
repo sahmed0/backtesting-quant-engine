@@ -1,9 +1,9 @@
-name: Deploy to GitHub Pages via web-version branch
+name: Deploy to GitHub Pages via main branch
 
 on:
   push:
     branches:
-      - web-version2
+      - main
   workflow_dispatch:
 
 permissions:
