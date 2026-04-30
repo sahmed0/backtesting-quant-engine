@@ -15,6 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kiwicarbon/assets/dist/kiwi.css">
 
   <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css">
   <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
@@ -73,12 +74,23 @@
 
     /* --- Typography --- */
     h1 {
-      font-size: clamp(1.8rem, 4vw, 3rem);
+      font-size: clamp(1.5rem, 0.786rem + 3.571vw, 2.5rem);
       margin: 0 0 0.5rem 0;
       line-height: 1.1;
-      background: linear-gradient(135deg, #1e293b, #000);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      color: #000;
+    }
+
+    h1 a {
+      text-decoration: none;
+      color: var(--text-main);
+      font-size: 3rem;
+      margin-right: 12px;
+      transition: color 0.2s ease;
+      will-change: color;
+    }
+
+    h1 a:hover {
+      color: var(--accent);
     }
 
     h2 {
@@ -490,7 +502,7 @@
 
     .social-icons a {
       color: var(--text-muted);
-      font-size: 1.5rem;
+      font-size: 2rem;
       transition: all 0.3s;
     }
 
@@ -555,7 +567,8 @@
 
     <div class="sidebar">
       <div class="glass-card">
-        <h1>QuantEngine</h1>
+        <h1><a href="https://sajidahmed.co.uk" target="_blank" rel="noopener"><i class="kiwi-logo"></i></a>QuantEngine
+        </h1>
         <p>Autoregressive Integrated Moving Average Trading Strategy Backtesting Engine. <br>Ornstein-Uhlenbeck Mean
           Reversion Strategy Under Development</p>
         <div class="social-icons" style="margin-bottom: 20px;">
@@ -678,7 +691,7 @@
   </div>
 
   <footer>
-    <div style="font-size: 0.9rem; color: var(--text-muted);">
+    <div style="font-size: 1rem; color: var(--text-muted);">
       <strong>Sajid Ahmed 2026</strong> • Licensed under GNU GPL v3.0
     </div>
     <div class="social-icons">
