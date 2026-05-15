@@ -39,6 +39,11 @@
       --bg-color: #e0f3ff;
     }
 
+    html {
+      scrollbar-width: thin;
+      scroll-behavior: smooth;
+    }
+
     body {
       font-family: 'Chakra Petch', sans-serif;
       margin: 0;
@@ -79,19 +84,6 @@
       margin: 0 0 0.5rem 0;
       line-height: 1.1;
       color: #000;
-    }
-
-    h1 a {
-      text-decoration: none;
-      color: var(--text-main);
-      font-size: 3rem;
-      margin-right: 12px;
-      transition: color 0.2s ease;
-      will-change: color;
-    }
-
-    h1 a:hover {
-      color: var(--accent);
     }
 
     h2 {
@@ -498,7 +490,7 @@
 
     .social-icons {
       display: flex;
-      gap: 15px;
+      gap: 1rem;
     }
 
     .social-icons a {
@@ -526,19 +518,11 @@
       .sidebar>* {
         flex: 1 1 300px;
       }
-
-      .glass-card {
-        padding: 20px;
-      }
     }
 
     @media (max-width: 600px) {
       body {
         padding: 3vw;
-      }
-
-      .glass-card {
-        padding: 15px;
       }
 
       .metrics-container {
@@ -556,7 +540,7 @@
       }
 
       h1 {
-        font-size: 2.2rem;
+        font-size: 2.5rem;
       }
     }
   </style>
@@ -568,12 +552,13 @@
 
     <div class="sidebar">
       <div class="glass-card">
-        <h1><a href="https://sajidahmed.co.uk" target="_blank" rel="noopener"><i class="kiwi-logo"></i></a>QuantEngine
+        <h1>QuantEngine
         </h1>
         <p>Autoregressive Integrated Moving Average Trading Strategy Backtesting Engine. <br>Ornstein-Uhlenbeck Mean
           Reversion Strategy Under Development</p>
         <div class="social-icons" style="margin-bottom: 20px;">
-          <a href="https://github.com/sahmed0" target="_blank" aria-label="GitHub"><i
+          <a href="https://sajidahmed.co.uk" target="_blank" rel="noopener"><i class="kiwi-logo"></i></a>
+          <a href="https://github.com/sahmed0/backtesting-quant-engine.git" target="_blank" aria-label="GitHub"><i
               class="fa-brands fa-github"></i></a>
           <a href="https://linkedin.com/in/s-ahmed1" target="_blank" aria-label="LinkedIn"><i
               class="fa-brands fa-linkedin"></i></a>
@@ -696,7 +681,8 @@
       <strong>Sajid Ahmed 2026</strong> • Licensed under GNU GPL v3.0
     </div>
     <div class="social-icons">
-      <a href="https://github.com/sahmed0" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+      <a href="https://sajidahmed.co.uk" target="_blank" rel="noopener"><i class="kiwi-logo"></i></a>
+      <a href="https://github.com/sahmed0/backtesting-quant-engine.git" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
       <a href="https://linkedin.com/in/s-ahmed1" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
     </div>
   </footer>
