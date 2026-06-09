@@ -1,4 +1,5 @@
-from multiprocessing import Queue
+from queue import Queue
+from typing import Optional
 
 import numpy as np
 from collections import deque
@@ -11,9 +12,13 @@ class OrnsteinUhlenbeckStrategy(Strategy):
     process using a rolling window of prices to generate mean-reversion signals.
     """
     
-    def __init__(self, eventsQueue: Queue, symbol: str, window_size: int = 60, entry_z: float = 2.0, exit_z: float = 0.0):
+    def __init__(self, eventsQueue: Optional[Queue] = None, symbol: str = "", window_size: int = 60, entry_z: float = 2.0, exit_z: float = 0.0):
         """
         Args:
+            eventsQueue: The shared event queue. Generated signals are pushed
+                onto it for the engine. May be None when the strategy is
+                exercised directly (e.g. in unit tests) and only the returned
+                signal is needed.
             symbol: The ticker symbol being traded.
             window_size: Number of periods to use for OLS calibration.
             entry_z: The Z-score threshold to enter a trade.
@@ -47,9 +52,11 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         
         # Calculate OU Parameters (assuming dt = 1)
         theta = -b
-        
-        # If theta is negative, the series is diverging (not mean reverting)
-        if theta <= 0:
+
+        # If theta is non-positive the series is diverging or a pure random
+        # walk (not mean reverting). A small epsilon guards against floating
+        # point noise from making a flat/trending series look mean-reverting.
+        if theta <= 1e-8:
             return 0.0, 0.0, False
             
         mu = a / theta
@@ -67,8 +74,8 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         """
         Processes new market data and emits signals if thresholds are breached.
         """
-        # Ensure the event is for our symbol
-        if event.symbol != self.symbol:
+        # Ignore non-market events and events for other symbols
+        if event.type != 'MARKET' or event.symbol != self.symbol:
             return None
             
         # Update our rolling window
@@ -110,5 +117,11 @@ class OrnsteinUhlenbeckStrategy(Strategy):
             elif self.invested == 'SHORT' and z_score <= self.exit_z:
                 signal = SignalEvent(self.symbol, event.timestamp, 'EXIT')
                 self.invested = False
-                
+
+        # Push the signal onto the shared event queue so the engine's event
+        # loop can route it to the portfolio. The signal is also returned for
+        # callers that consume it directly (e.g. unit tests).
+        if signal is not None and self.eventsQueue is not None:
+            self.eventsQueue.put(signal)
+
         return signal

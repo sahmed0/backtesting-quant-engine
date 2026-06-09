@@ -7,11 +7,11 @@ from queue import Queue
 import os
 import shutil
 from datetime import datetime
-from data import PolarsCSVDataHandler
+from data import CSVDataHandler
 
-class TestPolarsCSVDataHandler(unittest.TestCase):
+class TestCSVDataHandler(unittest.TestCase):
     """
-    Test suite for the Polars-based CSV data handler.
+    Test suite for the streaming CSV data handler.
     """
 
     def setUp(self):
@@ -26,7 +26,7 @@ class TestPolarsCSVDataHandler(unittest.TestCase):
             f.write("2023-01-01T10:01:00,150.5,151.5,150.0,1500\n")
         
         self.eventsQueue = Queue()
-        self.handler = PolarsCSVDataHandler(self.eventsQueue, self.csvDir, ["AAPL"])
+        self.handler = CSVDataHandler(self.eventsQueue, self.csvDir, ["AAPL"])
 
     def tearDown(self):
         """
@@ -49,8 +49,10 @@ class TestPolarsCSVDataHandler(unittest.TestCase):
         self.assertEqual(event1.symbol, "AAPL")
         self.assertEqual(event1.close, 150.0)
         
+        # getLatestBar returns the raw CSV row; values are strings that the
+        # rest of the system casts to float on use.
         latest = self.handler.getLatestBar("AAPL")
-        self.assertEqual(latest['close'], 150.0)
+        self.assertEqual(float(latest['close']), 150.0)
 
         # Second bar
         self.handler.updateBars()

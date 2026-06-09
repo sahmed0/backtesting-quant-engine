@@ -5,10 +5,20 @@ import asyncio
 
 from data import CSVDataHandler
 from strategy import SimpleMovingAverageStrategy
+from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
 from portfolio import Portfolio
 from execution import SimulatedExecutionHandler
 from engine import Backtest
 import performance
+
+# Strategy to run: 'sma' (moving average crossover) or 'ou' (Ornstein-Uhlenbeck)
+STRATEGY = 'sma'
+
+def build_strategy(events, symbol):
+    """Constructs the configured strategy instance."""
+    if STRATEGY == 'ou':
+        return OrnsteinUhlenbeckStrategy(events, symbol, window_size=60, entry_z=2.0, exit_z=0.0)
+    return SimpleMovingAverageStrategy(events, short_window=5, long_window=20)
 
 async def main_async():
     # Initialise Queue
@@ -28,7 +38,7 @@ async def main_async():
 
     # Initialise Components
     data_handler = CSVDataHandler(events, csv_dir, [symbol])
-    strategy = SimpleMovingAverageStrategy(events, short_window=5, long_window=20)
+    strategy = build_strategy(events, symbol)
     portfolio = Portfolio(events, initial_capital=100000.0)
     execution_handler = SimulatedExecutionHandler(events, data_handler)
     backtest = Backtest(data_handler, strategy, portfolio, execution_handler, events)

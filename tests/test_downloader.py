@@ -1,6 +1,10 @@
 import os
 import pandas as pd
 import pytest
+
+# Requires the optional yfinance dependency. Skip cleanly when not installed.
+pytest.importorskip("yfinance")
+
 from downloader import download_data
 
 def test_market_data_file_formatting(tmp_path):

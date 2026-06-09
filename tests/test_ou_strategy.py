@@ -12,9 +12,9 @@ def base_strategy():
 def create_market_event(price: float) -> MarketEvent:
     """Helper to quickly mock market data ticks."""
     return MarketEvent(
-        symbol="AAPL", 
-        timestamp=datetime.now(), 
-        open=price, high=price, low=price, close=price, volume=100
+        symbol="AAPL",
+        timestamp=datetime.now(),
+        high=price, low=price, close=price, volume=100
     )
 
 def test_strategy_warmup(base_strategy):

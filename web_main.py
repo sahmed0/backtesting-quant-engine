@@ -7,6 +7,7 @@ import traceback
 
 from data import CSVDataHandler
 from strategy import SimpleMovingAverageStrategy
+from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
 from portfolio import Portfolio
 from execution import SimulatedExecutionHandler
 from engine import Backtest
@@ -115,7 +116,15 @@ async def run_backtest(event):
         # Initialise backtest components
         events = queue.Queue()
         data_handler = CSVDataHandler(events, '/data', [symbol])
-        strategy = SimpleMovingAverageStrategy(events, short_window=5, long_window=20)
+
+        # Select the strategy chosen in the UI
+        strategy_choice = document.getElementById("strategy-select").value
+        if strategy_choice == "ou":
+            strategy = OrnsteinUhlenbeckStrategy(
+                events, symbol, window_size=60, entry_z=2.0, exit_z=0.0
+            )
+        else:
+            strategy = SimpleMovingAverageStrategy(events, short_window=5, long_window=20)
         portfolio = Portfolio(events, initial_capital=100000.0)
         execution_handler = SimulatedExecutionHandler(events, data_handler)
         backtest = Backtest(data_handler, strategy, portfolio, execution_handler, events)

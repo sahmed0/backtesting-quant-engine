@@ -55,12 +55,14 @@ class Portfolio:
         market_value = quantity * price
         
         self.current_holdings[symbol] = market_value
+        # 'price' is stored purely as chart metadata for the latest bar; it is
+        # not a position value and must be excluded from the equity total.
         self.current_holdings['price'] = price
-        
+
         # Calculate total equity
         total_market_value = sum(
-            value for key, value in self.current_holdings.items() 
-            if key not in ('cash', 'total', 'timestamp')
+            value for key, value in self.current_holdings.items()
+            if key not in ('cash', 'total', 'timestamp', 'price')
         )
         total_equity = self.current_cash + total_market_value
         
@@ -101,14 +103,28 @@ class Portfolio:
                     orderType='MARKET'
                 )
                 self.events_queue.put(order)
-                
-        elif direction == 'EXIT':
-            current_qty = self.current_positions.get(symbol, 0.0)
-            if current_qty > 0:
+
+        elif direction == 'SHORT':
+            # Opening a short sells shares we don't hold, which generates cash,
+            # so there is no up-front cash requirement to check here.
+            if current_price > 0:
                 order = OrderEvent(
                     symbol=symbol,
                     timestamp=timestamp,
-                    quantity=current_qty,
+                    quantity=order_quantity,
+                    direction='SHORT',
+                    orderType='MARKET'
+                )
+                self.events_queue.put(order)
+
+        elif direction == 'EXIT':
+            # Flatten whatever position exists, long or short.
+            current_qty = self.current_positions.get(symbol, 0.0)
+            if current_qty != 0:
+                order = OrderEvent(
+                    symbol=symbol,
+                    timestamp=timestamp,
+                    quantity=abs(current_qty),
                     direction='EXIT',
                     orderType='MARKET'
                 )
@@ -134,11 +150,19 @@ class Portfolio:
         if direction == 'LONG':
             self.current_positions[symbol] += quantity
             self.current_cash -= total_cost
-        elif direction in ('SHORT', 'EXIT'):
+        elif direction == 'SHORT':
+            # Opening/adding to a short: sell shares and receive the proceeds
+            # net of transaction costs.
             self.current_positions[symbol] -= quantity
-            # Assuming EXIT implies selling an existing long position.
-            # Cash increases by the fill cost, minus transaction costs
             self.current_cash += (fill_cost - commission - slippage)
+        elif direction == 'EXIT':
+            # Closing a position: sell to close a long, or buy to cover a short.
+            if self.current_positions[symbol] >= 0:
+                self.current_positions[symbol] -= quantity
+                self.current_cash += (fill_cost - commission - slippage)
+            else:
+                self.current_positions[symbol] += quantity
+                self.current_cash -= total_cost
 
         self.trades.append({
             'timestamp': event.timestamp.timestamp(),

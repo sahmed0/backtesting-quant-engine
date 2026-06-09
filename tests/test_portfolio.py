@@ -5,7 +5,6 @@ Tests for the portfolio module.
 import unittest
 from datetime import datetime
 from queue import Queue
-import polars as pl
 from portfolio import Portfolio
 from event import MarketEvent, SignalEvent, FillEvent
 
@@ -52,7 +51,8 @@ class TestPortfolio(unittest.TestCase):
         self.assertEqual(portfolio.current_holdings['AAPL'], 15000.0)
         self.assertEqual(portfolio.current_holdings['cash'], 90000.0)
         self.assertEqual(portfolio.current_holdings['total'], 105000.0)
-        self.assertEqual(portfolio.current_holdings['timestamp'], event_time)
+        # Timestamps are stored as epoch floats for JSON/chart serialisation.
+        self.assertEqual(portfolio.current_holdings['timestamp'], event_time.timestamp())
         
         self.assertEqual(len(portfolio.all_holdings), 1)
         self.assertEqual(portfolio.all_holdings[0]['total'], 105000.0)
@@ -135,7 +135,7 @@ class TestPortfolio(unittest.TestCase):
         
         df = portfolio.generate_equity_curve()
         self.assertEqual(len(df), 2)
-        self.assertListEqual(df.columns, ['timestamp', 'total'])
+        self.assertListEqual(list(df.columns), ['timestamp', 'total'])
         self.assertEqual(df['total'][1], 105000.0)
 
 if __name__ == '__main__':

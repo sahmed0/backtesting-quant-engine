@@ -554,8 +554,8 @@
       <div class="glass-card">
         <h1>QuantEngine
         </h1>
-        <p>Autoregressive Integrated Moving Average Trading Strategy Backtesting Engine. <br>Ornstein-Uhlenbeck Mean
-          Reversion Strategy Under Development</p>
+        <p>Event-driven Trading Strategy Backtesting Engine. <br>Choose between a Moving Average crossover and an
+          Ornstein-Uhlenbeck mean-reversion strategy.</p>
         <div class="social-icons" style="margin-bottom: 20px;">
           <a href="https://sajidahmed.co.uk" target="_blank" rel="noopener"><i class="kiwi-logo"></i></a>
           <a href="https://github.com/sahmed0/backtesting-quant-engine.git" target="_blank" aria-label="GitHub"><i
@@ -566,6 +566,14 @@
 
         <div id="status">
           <div class="pulse"></div> Initialising Engine
+        </div>
+
+        <div class="input-group" style="margin-bottom: 15px;">
+          <label for="strategy-select"><i class="fa-solid fa-brain"></i> Strategy</label>
+          <select id="strategy-select">
+            <option value="sma">Moving Average Crossover</option>
+            <option value="ou">Ornstein-Uhlenbeck (Mean Reversion)</option>
+          </select>
         </div>
 
         <div class="input-group">
@@ -700,6 +708,10 @@
     "./performance.py",
     "./web_main.py"
     ]
+    [[fetch]]
+    from = "strategies"
+    files = ["__init__.py", "ou_strategy.py"]
+    to_folder = "strategies"
     [[fetch]]
     from = "data"
     files = ["AAPL.csv", "AMZN.csv", "CL=F.csv", "GC=F.csv", "BTC-USD.csv", "GOOG.csv", "JPM.csv", "META.csv",
