@@ -5,17 +5,25 @@ import sys
 import os
 
 # Add parent directory to path to import modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from event import MarketEvent, SignalEvent
 from strategy import SimpleMovingAverageStrategy
 
+
 class TestSimpleMovingAverageStrategy(unittest.TestCase):
     def setUp(self):
         self.eventsQueue = Queue()
-        self.strategy = SimpleMovingAverageStrategy(self.eventsQueue, short_window=2, long_window=4)
+        # Long-only by default; allow_short defaults to False.
+        self.strategy = SimpleMovingAverageStrategy(
+            self.eventsQueue, short_window=2, long_window=4
+        )
+        # A separate instance with shorting enabled for the long/short tests.
+        self.short_strategy = SimpleMovingAverageStrategy(
+            self.eventsQueue, short_window=2, long_window=4, allow_short=True
+        )
         self.symbol = "AAPL"
-        
+
     def _create_market_event(self, price: float) -> MarketEvent:
         return MarketEvent(
             symbol=self.symbol,
@@ -23,55 +31,120 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
             close=price,
             high=price,
             low=price,
-            volume=100
+            volume=100,
         )
 
     def test_warm_up_period(self):
         # Insert 3 events, less than long_window (4)
         for price in [10.0, 11.0, 12.0]:
             self.strategy.calculate_signals(self._create_market_event(price))
-            
-        self.assertTrue(self.eventsQueue.empty(), "Should not emit signals during warm-up period")
+
+        self.assertTrue(
+            self.eventsQueue.empty(), "Should not emit signals during warm-up period"
+        )
 
     def test_crossover_long(self):
         # Prices: 10, 10, 10, 10 -> MAs: short=10, long=10
         for price in [10.0, 10.0, 10.0, 10.0]:
             self.strategy.calculate_signals(self._create_market_event(price))
         self.assertTrue(self.eventsQueue.empty())
-            
+
         # Price: 12 -> prices: [10, 10, 10, 12]
         # short_ma (last 2) = (10 + 12)/2 = 11
         # long_ma (last 4) = (10 + 10 + 10 + 12)/4 = 10.5
         # 11 > 10.5, emit LONG
         self.strategy.calculate_signals(self._create_market_event(12.0))
-        
+
         self.assertFalse(self.eventsQueue.empty())
         event = self.eventsQueue.get()
         self.assertIsInstance(event, SignalEvent)
-        self.assertEqual(event.direction, 'LONG')
+        self.assertEqual(event.direction, "LONG")
         self.assertEqual(event.symbol, self.symbol)
-        
-    def test_crossover_exit(self):
-        # Trigger LONG first
+
+    def test_long_only_exits_on_downcross(self):
+        # Default strategy is long-only: a downward cross flattens to flat and
+        # never opens a short.
         for price in [10.0, 10.0, 10.0, 10.0, 12.0]:
             self.strategy.calculate_signals(self._create_market_event(price))
-            
+
+        while not self.eventsQueue.empty():
+            self.eventsQueue.get()
+
+        # Price: 6 -> [10, 12, 8, 6] -> short_ma < long_ma -> EXIT only
+        self.strategy.calculate_signals(self._create_market_event(8.0))
+        self.strategy.calculate_signals(self._create_market_event(6.0))
+
+        self.assertFalse(self.eventsQueue.empty())
+        event = self.eventsQueue.get()
+        self.assertEqual(event.direction, "EXIT")
+        self.assertTrue(
+            self.eventsQueue.empty(), "Long-only strategy must not emit SHORT"
+        )
+
+    def test_crossover_flip_long_to_short(self):
+        # Trigger LONG first
+        for price in [10.0, 10.0, 10.0, 10.0, 12.0]:
+            self.short_strategy.calculate_signals(self._create_market_event(price))
+
         # Empty the queue
         while not self.eventsQueue.empty():
             self.eventsQueue.get()
-            
+
         # Prices are now: [10, 10, 10, 12] (maxlen 4) -> [10, 10, 12, 8]
         # Price: 8 -> short_ma = (12 + 8)/2 = 10
         # long_ma = (10 + 10 + 12 + 8)/4 = 10
         # Price: 6 -> [10, 12, 8, 6] -> short_ma = 7, long_ma = 9
-        # 7 < 9, emit EXIT
-        self.strategy.calculate_signals(self._create_market_event(8.0))
-        self.assertTrue(self.eventsQueue.empty()) # MAs are equal, no change
-        
-        self.strategy.calculate_signals(self._create_market_event(6.0))
+        # 7 < 9, flip from LONG to SHORT: emit EXIT then SHORT
+        self.short_strategy.calculate_signals(self._create_market_event(8.0))
+        self.assertTrue(self.eventsQueue.empty())  # MAs are equal, no change
+
+        self.short_strategy.calculate_signals(self._create_market_event(6.0))
+        self.assertFalse(self.eventsQueue.empty())
+
+        exit_event = self.eventsQueue.get()
+        self.assertEqual(exit_event.direction, "EXIT")
+
+        short_event = self.eventsQueue.get()
+        self.assertIsInstance(short_event, SignalEvent)
+        self.assertEqual(short_event.direction, "SHORT")
+        self.assertEqual(short_event.symbol, self.symbol)
+
+        self.assertTrue(self.eventsQueue.empty())
+
+    def test_crossover_short_from_flat(self):
+        # First fully-formed window already has short_ma < long_ma, so the
+        # strategy opens a short directly without a preceding EXIT.
+        for price in [10.0, 10.0, 10.0, 8.0]:
+            self.short_strategy.calculate_signals(self._create_market_event(price))
+
+        # Prices: [10, 10, 10, 8] -> short_ma = 9, long_ma = 9.5 -> SHORT
         self.assertFalse(self.eventsQueue.empty())
         event = self.eventsQueue.get()
-        self.assertEqual(event.direction, 'EXIT')
+        self.assertIsInstance(event, SignalEvent)
+        self.assertEqual(event.direction, "SHORT")
+        self.assertTrue(self.eventsQueue.empty())
 
-if __name__ == '__main__':
+    def test_crossover_flip_short_to_long(self):
+        # Open a short from flat first.
+        for price in [10.0, 10.0, 10.0, 8.0]:
+            self.short_strategy.calculate_signals(self._create_market_event(price))
+
+        while not self.eventsQueue.empty():
+            self.eventsQueue.get()
+
+        # Prices: [10, 10, 8] -> add 14 -> [10, 10, 8, 14]
+        # short_ma = (8 + 14)/2 = 11, long_ma = (10 + 10 + 8 + 14)/4 = 10.5
+        # 11 > 10.5, flip from SHORT to LONG: emit EXIT then LONG
+        self.short_strategy.calculate_signals(self._create_market_event(14.0))
+        self.assertFalse(self.eventsQueue.empty())
+
+        exit_event = self.eventsQueue.get()
+        self.assertEqual(exit_event.direction, "EXIT")
+
+        long_event = self.eventsQueue.get()
+        self.assertEqual(long_event.direction, "LONG")
+        self.assertTrue(self.eventsQueue.empty())
+
+
+if __name__ == "__main__":
     unittest.main()
