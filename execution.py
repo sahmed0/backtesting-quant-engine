@@ -4,16 +4,15 @@ Execution handler module for simulating order execution.
 
 from abc import ABC, abstractmethod
 from queue import Queue
-from datetime import datetime, timezone
 import logging
-from typing import Any
 
 from event import OrderEvent, FillEvent
 from data import DataHandler
 
 # Configure console logging
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
+
 
 class ExecutionHandler(ABC):
     """
@@ -29,53 +28,73 @@ class ExecutionHandler(ABC):
         """
         pass
 
+
 class SimulatedExecutionHandler(ExecutionHandler):
     """
     Simulated execution handler that converts all order events into
     fill events with simulated slippage and commission.
     """
 
-    def __init__(self, eventsQueue: Queue, dataHandler: DataHandler, fixed_commission: float = 0.001):
+    def __init__(
+        self,
+        eventsQueue: Queue,
+        dataHandler: DataHandler,
+        fixed_commission: float = 0.001,
+        slippage_pct: float = 0.0005,
+    ):
         """
         Initialises the handler, saving the events queue and data handler.
+
+        Args:
+            eventsQueue: The shared event queue.
+            dataHandler: Supplies the latest bar used as the execution price.
+            fixed_commission: Flat commission charged per fill.
+            slippage_pct: Fraction the fill price moves against the order, e.g.
+                0.0005 for 5 bps. LONG fills pay more and SHORT fills receive
+                less; EXIT fills are modelled without slippage.
         """
         self.eventsQueue = eventsQueue
         self.dataHandler = dataHandler
         self.fixed_commission = fixed_commission
+        self.slippage_pct = slippage_pct
 
     def executeOrder(self, event: OrderEvent) -> None:
         """
         Converts OrderEvent to FillEvent.
         """
-        if event.type != 'ORDER':
+        if event.type != "ORDER":
             return
 
         latest_bar = self.dataHandler.getLatestBar(event.symbol)
-        
+
         # If no bar data is available, we cannot execute the order in this simulation.
-        if not latest_bar or 'close' not in latest_bar:
-            logger.warning(f"No price data available for {event.symbol}. Cannot execute order.")
+        if not latest_bar or "close" not in latest_bar:
+            logger.warning(
+                f"No price data available for {event.symbol}. Cannot execute order."
+            )
             return
 
-        base_price = float(latest_bar['close'])
+        base_price = float(latest_bar["close"])
         direction = event.direction
 
-        # Calculate slippage (0.05%)
-        # LONG: pay more (+0.05%)
-        # SHORT: receive less (-0.05%)
+        # Apply the configured slippage to the base price.
+        # LONG: pay more (+slippage)
+        # SHORT: receive less (-slippage)
         # EXIT: For simplicity, assume worst-case execution if we don't know the exact side
         # In a real system, EXIT would check current position to determine if it's a buy or sell.
-        slippage_pct = 0.0005
-        
-        if direction == 'LONG':
+        slippage_pct = self.slippage_pct
+
+        if direction == "LONG":
             fill_price = base_price * (1 + slippage_pct)
-        elif direction == 'SHORT':
+        elif direction == "SHORT":
             fill_price = base_price * (1 - slippage_pct)
-        elif direction == 'EXIT':
-            fill_price = base_price # No slippage for EXIT orders in this simplified model
+        elif direction == "EXIT":
+            fill_price = (
+                base_price  # No slippage for EXIT orders in this simplified model
+            )
         else:
             fill_price = base_price
-            
+
         slippage_value = abs(fill_price - base_price)
 
         # Create FillEvent
@@ -86,7 +105,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
             direction=event.direction,
             fillPrice=fill_price,
             commission=self.fixed_commission,
-            slippage=slippage_value
+            slippage=slippage_value,
         )
 
         # Log the fill

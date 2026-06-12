@@ -163,6 +163,7 @@
     }
 
     select,
+    input[type="number"],
     input[type="file"] {
       width: 100%;
       padding: 14px;
@@ -181,10 +182,35 @@
     }
 
     select:focus,
+    input[type="number"]:focus,
     input[type="file"]:focus {
       outline: none;
       border-color: var(--accent-glow);
       box-shadow: 0 0 0 3px rgba(255, 83, 137, 0.2);
+    }
+
+    /* --- Strategy Parameter Fields --- */
+    .param-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .param-field {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .param-field span {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .param-field input[type="number"] {
+      cursor: text;
     }
 
     /* Drag & Drop Style File Input */
@@ -474,6 +500,144 @@
       z-index: 10;
     }
 
+    /* --- Analyse / Overfitting Lab button --- */
+    .btn-analyse {
+      background: linear-gradient(135deg, #818cf8 0%, #4f46e5 100%);
+      box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-analyse:hover:not(:disabled) {
+      box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+    }
+
+    /* --- Overfitting Lab heatmaps --- */
+    .heatmap-grids {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin: 15px 0 20px;
+    }
+
+    .heatmap-panel h3 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+      color: var(--text-main);
+    }
+
+    .heatmap-panel h3 span {
+      color: var(--text-muted);
+      font-weight: 400;
+      font-size: 0.85rem;
+    }
+
+    .heatmap {
+      display: grid;
+      gap: 6px;
+    }
+
+    .hm-cell {
+      aspect-ratio: 1 / 1;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+    }
+
+    .hm-cell small {
+      font-weight: 500;
+      font-size: 0.62rem;
+      color: rgba(15, 23, 42, 0.6);
+    }
+
+    .hm-axis {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .hm-corner {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      text-align: center;
+      align-self: center;
+    }
+
+    .hm-invalid {
+      background: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04) 6px, transparent 6px, transparent 12px);
+      color: #cbd5e1;
+      border-color: transparent;
+    }
+
+    .hm-pick {
+      outline: 3px solid #f59e0b;
+      outline-offset: -3px;
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35);
+    }
+
+    .hm-best {
+      outline: 3px dashed #047857;
+      outline-offset: -3px;
+    }
+
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .legend-swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .legend-gradient {
+      width: 90px;
+      height: 14px;
+      border-radius: 4px;
+      background: linear-gradient(to right, hsl(350, 65%, 55%), hsl(150, 65%, 90%), hsl(150, 65%, 45%));
+      display: inline-block;
+    }
+
+    .of-verdict {
+      background: rgba(255, 255, 255, 0.55);
+      border-radius: 14px;
+      padding: 16px 18px;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: var(--text-main);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+    }
+
+    .of-verdict strong {
+      color: var(--accent);
+    }
+
+    @media (max-width: 800px) {
+      .heatmap-grids {
+        grid-template-columns: 1fr;
+      }
+    }
+
     /* --- Footer & Socials --- */
     footer {
       width: 100%;
@@ -576,6 +740,76 @@
           </select>
         </div>
 
+        <div class="input-group" id="sma-params" style="margin-bottom: 15px;">
+          <label><i class="fa-solid fa-sliders"></i> Moving Average Windows</label>
+          <div class="param-row">
+            <div class="param-field">
+              <span>Short Window</span>
+              <input type="number" id="sma-short" value="5" min="1" step="1">
+            </div>
+            <div class="param-field">
+              <span>Long Window</span>
+              <input type="number" id="sma-long" value="20" min="2" step="1">
+            </div>
+          </div>
+        </div>
+
+        <div class="input-group" id="ou-params" style="margin-bottom: 15px; display: none;">
+          <label><i class="fa-solid fa-sliders"></i> OU Parameters</label>
+          <div class="param-row">
+            <div class="param-field">
+              <span>Window</span>
+              <input type="number" id="ou-window" value="60" min="10" step="1">
+            </div>
+            <div class="param-field">
+              <span>Entry Z</span>
+              <input type="number" id="ou-entry-z" value="2.0" min="0" step="0.1">
+            </div>
+            <div class="param-field">
+              <span>Exit Z</span>
+              <input type="number" id="ou-exit-z" value="0.0" step="0.1">
+            </div>
+          </div>
+        </div>
+
+        <div class="input-group" style="margin-bottom: 15px;">
+          <label for="sizer-select"><i class="fa-solid fa-scale-balanced"></i> Position Sizing</label>
+          <select id="sizer-select">
+            <option value="percent">Percent of Equity (10%)</option>
+            <option value="vol">Volatility Target (15%)</option>
+            <option value="atr">ATR-Stop Fixed Risk (2%)</option>
+            <option value="kelly">Fractional Kelly (½)</option>
+            <option value="fixed">Fixed (100 units)</option>
+          </select>
+        </div>
+
+        <div class="input-group" style="margin-bottom: 15px;">
+          <label><i class="fa-solid fa-coins"></i> Capital &amp; Costs</label>
+          <div class="param-row">
+            <div class="param-field">
+              <span>Initial Capital ($)</span>
+              <input type="number" id="initial-capital" value="100000" min="1" step="1000">
+            </div>
+          </div>
+          <div class="param-row" style="margin-top: 10px;">
+            <div class="param-field">
+              <span>Commission ($/trade)</span>
+              <input type="number" id="commission" value="0.001" min="0" step="0.001">
+            </div>
+            <div class="param-field">
+              <span>Slippage (%)</span>
+              <input type="number" id="slippage" value="0.05" min="0" step="0.01">
+            </div>
+          </div>
+        </div>
+
+        <div class="input-group" style="margin-bottom: 15px;">
+          <label for="allow-short">
+            <input type="checkbox" id="allow-short" />
+            Allow short selling
+          </label>
+        </div>
+
         <div class="input-group">
           <label for="ticker-select"><i class="fa-solid fa-list"></i> Pre-loaded Ticker</label>
           <select id="ticker-select">
@@ -609,6 +843,10 @@
         <button id="run-btn" disabled style="margin-top: 25px;">
           <i class="fa-solid fa-play"></i> Execute Backtest
         </button>
+
+        <button id="analyse-btn" class="btn-analyse" disabled style="margin-top: 12px;">
+          <i class="fa-solid fa-magnifying-glass-chart"></i> Analyse Overfitting
+        </button>
       </div>
     </div>
 
@@ -633,6 +871,30 @@
           <div class="metric-box">
             <div class="metric-header"><span>Win Rate</span> <i class="fa-solid fa-bullseye"></i></div>
             <div class="metric-value" id="val-winrate">-</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-header"><span>CAGR</span> <i class="fa-solid fa-seedling"></i></div>
+            <div class="metric-value" id="val-cagr">-</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-header"><span>Alpha</span> <i class="fa-solid fa-a"></i></div>
+            <div class="metric-value" id="val-alpha">-</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-header"><span>Information Ratio</span> <i class="fa-solid fa-circle-info"></i></div>
+            <div class="metric-value" id="val-inforatio">-</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-header"><span>Calmar Ratio</span> <i class="fa-solid fa-shield-halved"></i></div>
+            <div class="metric-value" id="val-calmar">-</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-header"><span>Number of Trades</span> <i class="fa-solid fa-hashtag"></i></div>
+            <div class="metric-value" id="val-trades">-</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-header"><span>Avg Trade Duration</span> <i class="fa-solid fa-clock"></i></div>
+            <div class="metric-value" id="val-duration">-</div>
           </div>
         </div>
 
@@ -681,6 +943,36 @@
         </div>
       </div>
 
+      <div class="glass-card" id="overfitting-card" style="display: none; margin-top: 20px;">
+        <h2><i class="fa-solid fa-magnifying-glass-chart"></i> Overfitting Lab</h2>
+        <p id="of-intro">
+          The moving-average crossover is optimised on the first 70% of history
+          (in-sample), then every parameter pair is scored on the held-out final
+          30% (out-of-sample). Each cell is a (short, long) window pair, coloured
+          by Sharpe ratio on a shared scale. If the strategy were robust, the two
+          panels would look alike. They rarely do.
+        </p>
+
+        <div class="heatmap-grids">
+          <div class="heatmap-panel">
+            <h3>In-Sample <span>— what you optimised</span></h3>
+            <div id="heatmap-is" class="heatmap"></div>
+          </div>
+          <div class="heatmap-panel">
+            <h3>Out-of-Sample <span>— what actually happened</span></h3>
+            <div id="heatmap-oos" class="heatmap"></div>
+          </div>
+        </div>
+
+        <div class="heatmap-legend">
+          <div class="legend-item"><span class="legend-gradient"></span> low&nbsp;→&nbsp;high Sharpe</div>
+          <div class="legend-item"><span class="legend-swatch" style="background: transparent; outline: 3px solid #f59e0b; outline-offset: -3px;"></span> in-sample pick</div>
+          <div class="legend-item"><span class="legend-swatch" style="background: transparent; outline: 3px dashed #047857; outline-offset: -3px;"></span> out-of-sample best (hindsight)</div>
+        </div>
+
+        <div id="of-verdict" class="of-verdict"></div>
+      </div>
+
     </div>
   </div>
 
@@ -701,6 +993,7 @@
     files = [
     "./data.py",
     "./strategy.py",
+    "./position_sizing.py",
     "./portfolio.py",
     "./execution.py",
     "./engine.py",
@@ -776,6 +1069,7 @@
     const tickerSelect = document.getElementById('ticker-select');
     const clearBtn = document.getElementById('clear-upload');
     const runBtn = document.getElementById('run-btn');
+    const analyseBtn = document.getElementById('analyse-btn');
     const statusDiv = document.getElementById('status');
 
     // Global Chart.js Font override to match Theme
@@ -785,24 +1079,38 @@
     function updateUIState() {
       const hasUpload = csvUpload.files.length > 0;
       const hasSelection = tickerSelect.value !== "";
+      const hasData = hasUpload || hasSelection;
 
-      if (hasUpload) {
-        tickerSelect.disabled = true;
-        clearBtn.style.display = 'flex';
-        runBtn.disabled = false;
-      } else {
-        tickerSelect.disabled = false;
-        clearBtn.style.display = 'none';
-        runBtn.disabled = !hasSelection;
-      }
+      tickerSelect.disabled = hasUpload;
+      clearBtn.style.display = hasUpload ? 'flex' : 'none';
+      runBtn.disabled = !hasData;
+      analyseBtn.disabled = !hasData;
 
-      if (runBtn.innerText.includes('Running')) {
+      // While either job is in flight, keep both buttons disabled so a second
+      // run can't interleave with the first on the single Pyodide thread.
+      const busy = runBtn.innerText.includes('Running') || analyseBtn.innerText.includes('Analysing');
+      if (busy) {
         runBtn.disabled = true;
+        analyseBtn.disabled = true;
       }
     }
 
     csvUpload.addEventListener('change', updateUIState);
     tickerSelect.addEventListener('change', updateUIState);
+
+    // --- Strategy Parameter Visibility ---
+    const strategySelect = document.getElementById('strategy-select');
+    const smaParams = document.getElementById('sma-params');
+    const ouParams = document.getElementById('ou-params');
+
+    function updateStrategyParams() {
+      const isOU = strategySelect.value === 'ou';
+      smaParams.style.display = isOU ? 'none' : 'block';
+      ouParams.style.display = isOU ? 'block' : 'none';
+    }
+
+    strategySelect.addEventListener('change', updateStrategyParams);
+    updateStrategyParams();
 
     clearBtn.addEventListener('click', function () {
       csvUpload.value = '';
@@ -826,7 +1134,7 @@
       }
     }
 
-    window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJSON) {
+    window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJSON, benchmarkJSON) {
       document.getElementById('charts-card').style.display = 'block';
       statusDiv.innerHTML = '<i class="fa-solid fa-check text-success"></i>';
 
@@ -834,9 +1142,12 @@
       const equity = JSON.parse(equityJSON);
       const prices = JSON.parse(pricesJSON);
       const trades = JSON.parse(tradesJSON);
+      const benchmark = benchmarkJSON ? JSON.parse(benchmarkJSON) : [];
 
       // Dynamically check metrics to apply color coding
       formatMetricColor('val-return', document.getElementById('val-return').innerText);
+      formatMetricColor('val-cagr', document.getElementById('val-cagr').innerText);
+      formatMetricColor('val-alpha', document.getElementById('val-alpha').innerText);
 
       const labels = timestamps.map(ts => new Date(ts * 1000).toLocaleDateString(undefined, {
         year: 'numeric', month: 'short', day: 'numeric'
@@ -869,17 +1180,30 @@
         type: 'line',
         data: {
           labels: labels,
-          datasets: [{
-            label: 'Portfolio Equity ($)',
-            data: equity,
-            borderColor: '#ff0051',
-            backgroundColor: equityGradient,
-            borderWidth: 2,
-            fill: true,
-            pointRadius: 0,
-            pointHoverRadius: 8,
-            tension: 0.3
-          }]
+          datasets: [
+            {
+              label: 'Portfolio Equity ($)',
+              data: equity,
+              borderColor: '#ff0051',
+              backgroundColor: equityGradient,
+              borderWidth: 2,
+              fill: true,
+              pointRadius: 0,
+              pointHoverRadius: 8,
+              tension: 0.3
+            },
+            {
+              label: 'Buy & Hold ($)',
+              data: benchmark,
+              borderColor: '#9333ea',
+              borderWidth: 1.5,
+              borderDash: [6, 4],
+              fill: false,
+              pointRadius: 0,
+              pointHoverRadius: 8,
+              tension: 0.3
+            }
+          ]
         },
         options: {
           responsive: true,
@@ -994,6 +1318,79 @@
         priceChartInstance.resetZoom();
         document.getElementById('resetPriceZoom').style.display = 'none';
       };
+    };
+
+    // --- Overfitting Lab heatmaps ---
+    // Maps a Sharpe ratio to a diverging colour on a shared scale: pale near
+    // zero, vivid green for strong positive, vivid red for negative.
+    function sharpeColor(s, scale) {
+      if (s === null || s === undefined) return null;
+      const t = Math.max(-1, Math.min(1, s / scale));
+      const hue = t >= 0 ? 150 : 350;
+      const light = 92 - 50 * Math.abs(t); // 92% (pale) -> 42% (vivid)
+      return `hsl(${hue}, 65%, ${light}%)`;
+    }
+
+    function renderHeatmap(containerId, grid, shortWins, longWins, pickCell, bestCell, scale) {
+      const container = document.getElementById(containerId);
+      container.style.gridTemplateColumns = `46px repeat(${longWins.length}, 1fr)`;
+
+      let html = '<div class="hm-corner">short&nbsp;\\&nbsp;long</div>';
+      longWins.forEach(l => { html += `<div class="hm-axis">${l}</div>`; });
+
+      grid.forEach((row, i) => {
+        html += `<div class="hm-axis">${shortWins[i]}</div>`;
+        row.forEach((val, j) => {
+          let cls = 'hm-cell';
+          if (pickCell && pickCell[0] === i && pickCell[1] === j) cls += ' hm-pick';
+          if (bestCell && bestCell[0] === i && bestCell[1] === j) cls += ' hm-best';
+          if (val === null || val === undefined) {
+            html += `<div class="${cls} hm-invalid">—</div>`;
+          } else {
+            const bg = sharpeColor(val, scale);
+            html += `<div class="${cls}" style="background:${bg}">${val.toFixed(2)}<small>Sharpe</small></div>`;
+          }
+        });
+      });
+      container.innerHTML = html;
+    }
+
+    window.updateHeatmaps = function (payloadJSON) {
+      const p = JSON.parse(payloadJSON);
+      document.getElementById('overfitting-card').style.display = 'block';
+      statusDiv.innerHTML = '<i class="fa-solid fa-check text-success"></i>';
+
+      // Shared colour scale across both panels so they are directly comparable.
+      let maxAbs = 0.5;
+      [].concat(...p.is_sharpe, ...p.oos_sharpe).forEach(v => {
+        if (v !== null && v !== undefined) maxAbs = Math.max(maxAbs, Math.abs(v));
+      });
+
+      // In-sample panel: ring the cell you'd pick. Out-of-sample panel: ring the
+      // SAME cell (so the eye tracks where the pick landed) plus mark the cell
+      // that was actually best out of sample.
+      renderHeatmap('heatmap-is', p.is_sharpe, p.short_windows, p.long_windows, p.is_best, null, maxAbs);
+      renderHeatmap('heatmap-oos', p.oos_sharpe, p.short_windows, p.long_windows, p.is_best, p.oos_best, maxAbs);
+
+      const [ps, pl] = p.is_best_params;
+      const [bs, bl] = p.oos_best_params;
+      const isSh = p.is_best_is_sharpe, oosSh = p.is_best_oos_sharpe;
+      const rankTxt = p.is_best_oos_rank
+        ? `#${p.is_best_oos_rank} of ${p.num_cells}`
+        : 'unranked';
+      const survived = p.is_best_oos_rank && p.is_best_oos_rank <= 2;
+
+      document.getElementById('of-verdict').innerHTML =
+        `In sample you would pick <strong>SMA(${ps}, ${pl})</strong> — the brightest ` +
+        `cell, Sharpe <strong>${isSh.toFixed(2)}</strong>. Run those exact parameters ` +
+        `on data they never saw and they score <strong>${oosSh.toFixed(2)}</strong>, ` +
+        `ranking <strong>${rankTxt}</strong> out of sample. The genuinely best ` +
+        `out-of-sample pair was <strong>SMA(${bs}, ${bl})</strong> ` +
+        `(Sharpe ${p.oos_best_oos_sharpe.toFixed(2)}). ` +
+        (survived
+          ? `Here the in-sample choice happened to hold up — a robust sign.`
+          : `The bright in-sample spike does not survive: that collapse, and the ` +
+            `fact the winning cell moves, is curve over-fitting made visible.`);
     };
   </script>
 </body>
