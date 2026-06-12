@@ -2,18 +2,20 @@ import time
 import queue
 from typing import Any
 
+
 class Backtest:
     """
     Encapsulates the settings and components for carrying out
     an event-driven backtest.
     """
+
     def __init__(
-        self, 
-        data_handler: Any, 
-        strategy: Any, 
-        portfolio: Any, 
-        execution_handler: Any, 
-        event_queue: queue.Queue
+        self,
+        data_handler: Any,
+        strategy: Any,
+        portfolio: Any,
+        execution_handler: Any,
+        event_queue: queue.Queue,
     ):
         """
         Initialises the backtest.
@@ -45,14 +47,14 @@ class Backtest:
                     break
                 else:
                     if event is not None:
-                        if event.type == 'MARKET':
+                        if event.type == "MARKET":
                             self.strategy.calculate_signals(event)
                             self.portfolio.update_timeindex(event)
-                        elif event.type == 'SIGNAL':
+                        elif event.type == "SIGNAL":
                             self.portfolio.update_signal(event)
-                        elif event.type == 'ORDER':
+                        elif event.type == "ORDER":
                             self.execution_handler.executeOrder(event)
-                        elif event.type == 'FILL':
+                        elif event.type == "FILL":
                             self.portfolio.update_fill(event)
-            
+
             time.sleep(0)
