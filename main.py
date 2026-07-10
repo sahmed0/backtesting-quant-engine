@@ -7,25 +7,53 @@ from data import CSVDataHandler
 from strategy import SimpleMovingAverageStrategy
 from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
 from portfolio import Portfolio
+from position_sizing import (
+    FixedSizer,
+    PercentEquitySizer,
+    VolatilityTargetSizer,
+    ATRStopSizer,
+    FractionalKellySizer,
+)
 from execution import SimulatedExecutionHandler
 from engine import Backtest
 import performance
 
 # Strategy to run: 'sma' (moving average crossover) or 'ou' (Ornstein-Uhlenbeck)
-STRATEGY = 'sma'
+STRATEGY = "sma"
+
+# Position sizing: 'fixed', 'percent' (% of equity), 'vol' (volatility target),
+# 'atr' (ATR-stop fixed risk), or 'kelly' (fractional Kelly).
+SIZING = "percent"
+
 
 def build_strategy(events, symbol):
     """Constructs the configured strategy instance."""
-    if STRATEGY == 'ou':
-        return OrnsteinUhlenbeckStrategy(events, symbol, window_size=60, entry_z=2.0, exit_z=0.0)
+    if STRATEGY == "ou":
+        return OrnsteinUhlenbeckStrategy(
+            events, symbol, window_size=60, entry_z=2.0, exit_z=0.0
+        )
     return SimpleMovingAverageStrategy(events, short_window=5, long_window=20)
+
+
+def build_sizer():
+    """Constructs the configured position sizer."""
+    if SIZING == "percent":
+        return PercentEquitySizer(fraction=0.1)
+    if SIZING == "vol":
+        return VolatilityTargetSizer(target_volatility=0.15, lookback=20)
+    if SIZING == "atr":
+        return ATRStopSizer(risk_fraction=0.02, atr_period=14, atr_multiple=2.0)
+    if SIZING == "kelly":
+        return FractionalKellySizer(kelly_fraction=0.5, min_trades=10)
+    return FixedSizer(100.0)
+
 
 async def main_async():
     # Initialise Queue
     events = queue.Queue()
 
     # Set CSV Path
-    csv_path = 'data/sample_data.csv'
+    csv_path = "data/AAPL.csv"
 
     # Error Handling
     if not os.path.exists(csv_path):
@@ -39,7 +67,7 @@ async def main_async():
     # Initialise Components
     data_handler = CSVDataHandler(events, csv_dir, [symbol])
     strategy = build_strategy(events, symbol)
-    portfolio = Portfolio(events, initial_capital=100000.0)
+    portfolio = Portfolio(events, initial_capital=100000.0, sizer=build_sizer())
     execution_handler = SimulatedExecutionHandler(events, data_handler)
     backtest = Backtest(data_handler, strategy, portfolio, execution_handler, events)
 
@@ -59,6 +87,7 @@ async def main_async():
         print(f"Max Drawdown: {stats['max_drawdown'] * 100:.2f}%")
         print(f"Win Rate:     {stats['win_rate'] * 100:.2f}%")
         print("-" * 40)
+
 
 if __name__ == "__main__":
     asyncio.run(main_async())

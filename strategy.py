@@ -8,16 +8,24 @@ from queue import Queue
 from typing import Dict, Literal, Optional
 from event import MarketEvent, SignalEvent
 
+
 class Strategy(ABC):
     """
     Abstract base class for trading strategies.
     """
 
-    def __init__(self, eventsQueue: Queue):
+    def __init__(self, eventsQueue: Queue, allow_short: bool = False):
         """
         Initialises the strategy with the events queue.
+
+        Args:
+            eventsQueue: The shared event queue.
+            allow_short: When False (the default) the strategy is long-only and
+                never emits SHORT signals. When True the strategy may open short
+                positions.
         """
         self.eventsQueue = eventsQueue
+        self.allow_short = allow_short
 
     @abstractmethod
     def calculate_signals(self, event: MarketEvent) -> None:
@@ -26,57 +34,78 @@ class Strategy(ABC):
         """
         pass
 
+
 class SimpleMovingAverageStrategy(Strategy):
     """
     A simple moving average crossover strategy.
     Emits LONG signals when the short MA crosses above the long MA.
-    Emits EXIT signals when the short MA crosses below the long MA.
+    Emits SHORT signals when the short MA crosses below the long MA.
+    On a reversal the existing position is flattened with an EXIT before the
+    opposite position is opened, since the portfolio sizes each order at a
+    fixed quantity and cannot flip a position in a single order.
     """
 
-    def __init__(self, eventsQueue: Queue, short_window: int, long_window: int):
+    def __init__(
+        self,
+        eventsQueue: Queue,
+        short_window: int,
+        long_window: int,
+        allow_short: bool = False,
+    ):
         """
         Initialises the strategy with short and long moving average windows.
         """
-        super().__init__(eventsQueue)
+        super().__init__(eventsQueue, allow_short)
         self.short_window = short_window
         self.long_window = long_window
-        
+
         # Maps symbol to a deque of its most recent closing prices
         self.prices: Dict[str, deque[float]] = {}
-        
+
         # Maps symbol to its current position state ('LONG' or None)
-        self.positions: Dict[str, Optional[Literal['LONG', 'SHORT', 'EXIT']]] = {}
+        self.positions: Dict[str, Optional[Literal["LONG", "SHORT", "EXIT"]]] = {}
 
     def calculate_signals(self, event: MarketEvent) -> None:
         """
         Calculates and emits SMA crossover signals.
         """
-        if event.type != 'MARKET':
+        if event.type != "MARKET":
             return
-            
+
         symbol = event.symbol
         close_price = event.close
-        
+
         if symbol not in self.prices:
             self.prices[symbol] = deque(maxlen=self.long_window)
             self.positions[symbol] = None
-            
+
         self.prices[symbol].append(close_price)
-        
+
         # Wait for the warm-up period to complete
         if len(self.prices[symbol]) < self.long_window:
             return
-            
+
         prices_list = list(self.prices[symbol])
-        short_ma = sum(prices_list[-self.short_window:]) / self.short_window
+        short_ma = sum(prices_list[-self.short_window :]) / self.short_window
         long_ma = sum(prices_list) / self.long_window
-        
+
         current_position = self.positions[symbol]
-        
-        if short_ma > long_ma and current_position != 'LONG':
-            self.eventsQueue.put(SignalEvent(symbol, event.timestamp, 'LONG'))
-            self.positions[symbol] = 'LONG'
-            
-        elif short_ma < long_ma and current_position == 'LONG':
-            self.eventsQueue.put(SignalEvent(symbol, event.timestamp, 'EXIT'))
-            self.positions[symbol] = 'EXIT'
+
+        if short_ma > long_ma and current_position != "LONG":
+            # Cover any open short before going long.
+            if current_position == "SHORT":
+                self.eventsQueue.put(SignalEvent(symbol, event.timestamp, "EXIT"))
+            self.eventsQueue.put(SignalEvent(symbol, event.timestamp, "LONG"))
+            self.positions[symbol] = "LONG"
+
+        elif short_ma < long_ma:
+            if self.allow_short and current_position != "SHORT":
+                # Close any open long before going short.
+                if current_position == "LONG":
+                    self.eventsQueue.put(SignalEvent(symbol, event.timestamp, "EXIT"))
+                self.eventsQueue.put(SignalEvent(symbol, event.timestamp, "SHORT"))
+                self.positions[symbol] = "SHORT"
+            elif not self.allow_short and current_position == "LONG":
+                # Long-only: simply flatten the existing long.
+                self.eventsQueue.put(SignalEvent(symbol, event.timestamp, "EXIT"))
+                self.positions[symbol] = "EXIT"

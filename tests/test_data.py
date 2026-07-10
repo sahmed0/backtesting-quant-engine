@@ -6,8 +6,8 @@ import unittest
 from queue import Queue
 import os
 import shutil
-from datetime import datetime
 from data import CSVDataHandler
+
 
 class TestCSVDataHandler(unittest.TestCase):
     """
@@ -24,7 +24,7 @@ class TestCSVDataHandler(unittest.TestCase):
             f.write("timestamp,close,high,low,volume\n")
             f.write("2023-01-01T10:00:00,150.0,151.0,149.0,1000\n")
             f.write("2023-01-01T10:01:00,150.5,151.5,150.0,1500\n")
-        
+
         self.eventsQueue = Queue()
         self.handler = CSVDataHandler(self.eventsQueue, self.csvDir, ["AAPL"])
 
@@ -41,18 +41,18 @@ class TestCSVDataHandler(unittest.TestCase):
         and updates the shouldContinueBacktest flag when data is exhausted.
         """
         self.assertTrue(self.handler.shouldContinueBacktest)
-        
+
         # First bar
         self.handler.updateBars()
         self.assertEqual(self.eventsQueue.qsize(), 1)
         event1 = self.eventsQueue.get()
         self.assertEqual(event1.symbol, "AAPL")
         self.assertEqual(event1.close, 150.0)
-        
+
         # getLatestBar returns the raw CSV row; values are strings that the
         # rest of the system casts to float on use.
         latest = self.handler.getLatestBar("AAPL")
-        self.assertEqual(float(latest['close']), 150.0)
+        self.assertEqual(float(latest["close"]), 150.0)
 
         # Second bar
         self.handler.updateBars()
@@ -63,6 +63,7 @@ class TestCSVDataHandler(unittest.TestCase):
         # No more data
         self.handler.updateBars()
         self.assertFalse(self.handler.shouldContinueBacktest)
+
 
 if __name__ == "__main__":
     unittest.main()
