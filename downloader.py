@@ -3,14 +3,14 @@ Script to download historical market data using yfinance.
 """
 
 import os
-import yfinance as yf
+
 import pandas as pd
+import yfinance as yf
 from tqdm import tqdm
-from typing import List
 
 
 def download_data(
-    tickers: List[str], start_date: str, end_date: str, output_dir: str = "data"
+    tickers: list[str], start_date: str, end_date: str, output_dir: str = "data"
 ) -> None:
     """
     Downloads historical data for the given tickers and saves them as CSVs.

@@ -3,6 +3,7 @@ Performance metrics and summary statistics for trading portfolios.
 """
 
 import numpy as np
+
 from portfolio import Portfolio
 
 

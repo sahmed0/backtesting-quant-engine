@@ -1,3 +1,4 @@
+from collections import deque
 from queue import Queue
 
 import numpy as np
@@ -51,11 +52,11 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         Returns the dynamic mean, standard deviation, and a valid flag.
         """
         # Convert deque to numpy array for vector math
-        P = np.array(self.prices)
+        price_series = np.array(self.prices)
 
         # x is lagged prices (t-1), y is price differences (t)
-        x = P[:-1]
-        y = np.diff(P)
+        x = price_series[:-1]
+        y = np.diff(price_series)
 
         # Perform Linear Regression (OLS) -> y = mx + c
         # np.polyfit returns [slope (b), intercept (a)]

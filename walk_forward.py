@@ -23,30 +23,30 @@ once. The script contrasts that stitched walk-forward result against the naive
 Run:  python walk_forward.py [SYMBOL]   (default SYMBOL: AAPL)
 """
 
+import asyncio
+import logging
 import os
 import queue
 import sys
-import asyncio
 
 import numpy as np
 
-from data import CSVDataHandler
-from strategy import SimpleMovingAverageStrategy
-from portfolio import Portfolio
-from position_sizing import PercentEquitySizer
-from execution import SimulatedExecutionHandler
-from engine import Backtest
 import performance
+from data import CSVDataHandler
+from engine import Backtest
+from execution import SimulatedExecutionHandler
 
-# Reuse the slicing-aware helpers and grid from the simple-split demo. Importing
-# the module also quiets the execution handler's per-fill logging.
+# Reuse the slicing-aware helpers and grid from the simple-split demo.
 from overfitting_demo import (
-    read_timestamps,
-    param_grid,
-    _fmt_stats,
     DATA_DIR,
     INITIAL_CAPITAL,
+    _fmt_stats,
+    param_grid,
+    read_timestamps,
 )
+from portfolio import Portfolio
+from position_sizing import PercentEquitySizer
+from strategy import SimpleMovingAverageStrategy
 
 # Rolling-window geometry, measured in bars. With ~250 trading days per year on
 # this daily data: IS ~= 4 years, OOS ~= 1 year, stepping one OOS window at a

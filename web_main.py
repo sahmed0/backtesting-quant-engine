@@ -243,7 +243,12 @@ async def analyse_overfitting(event):
         is_start, is_end = timestamps[0], timestamps[split_idx - 1]
         oos_start, oos_end = timestamps[split_idx], timestamps[-1]
 
-        valid = sum(1 for s in OF_SHORT_WINDOWS for l in OF_LONG_WINDOWS if s < l)
+        valid = sum(
+            1
+            for short_w in OF_SHORT_WINDOWS
+            for long_w in OF_LONG_WINDOWS
+            if short_w < long_w
+        )
         total = 2 * valid
 
         status_el.innerText = f"Analysing... 0/{total}"

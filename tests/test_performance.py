@@ -3,7 +3,8 @@ Unit tests for the performance module.
 """
 
 import numpy as np
-from performance import calculate_sharpe_ratio, calculate_drawdown
+
+from performance import calculate_drawdown, calculate_sharpe_ratio
 
 
 def test_calculate_sharpe_ratio():
