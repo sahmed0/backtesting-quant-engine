@@ -2,12 +2,12 @@
 Execution handler module for simulating order execution.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from queue import Queue
-import logging
 
-from event import OrderEvent, FillEvent
 from data import DataHandler
+from event import FillEvent, OrderEvent
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class ExecutionHandler(ABC):
     """
 
     @abstractmethod
-    def executeOrder(self, event: OrderEvent) -> None:
+    def execute_order(self, event: OrderEvent) -> None:
         """
         Takes an OrderEvent and executes it, producing a FillEvent
         that gets placed onto the events queue.
@@ -35,8 +35,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
     def __init__(
         self,
-        eventsQueue: Queue,
-        dataHandler: DataHandler,
+        events: Queue,
+        data_handler: DataHandler,
         fixed_commission: float = 0.001,
         slippage_pct: float = 0.0005,
     ):
@@ -44,26 +44,26 @@ class SimulatedExecutionHandler(ExecutionHandler):
         Initialises the handler, saving the events queue and data handler.
 
         Args:
-            eventsQueue: The shared event queue.
-            dataHandler: Supplies the latest bar used as the execution price.
+            events: The shared event queue.
+            data_handler: Supplies the latest bar used as the execution price.
             fixed_commission: Flat commission charged per fill.
             slippage_pct: Fraction the fill price moves against the order, e.g.
                 0.0005 for 5 bps. LONG fills pay more and SHORT fills receive
                 less; EXIT fills are modelled without slippage.
         """
-        self.eventsQueue = eventsQueue
-        self.dataHandler = dataHandler
+        self.events = events
+        self.data_handler = data_handler
         self.fixed_commission = fixed_commission
         self.slippage_pct = slippage_pct
 
-    def executeOrder(self, event: OrderEvent) -> None:
+    def execute_order(self, event: OrderEvent) -> None:
         """
         Converts OrderEvent to FillEvent.
         """
         if event.type != "ORDER":
             return
 
-        latest_bar = self.dataHandler.getLatestBar(event.symbol)
+        latest_bar = self.data_handler.get_latest_bar(event.symbol)
 
         # If no bar data is available, we cannot execute the order in this simulation.
         if not latest_bar or "close" not in latest_bar:
@@ -101,7 +101,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
             timestamp=event.timestamp,
             quantity=event.quantity,
             direction=event.direction,
-            fillPrice=fill_price,
+            fill_price=fill_price,
             commission=self.fixed_commission,
             slippage=slippage_value,
         )
@@ -109,8 +109,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # Log the fill
         logger.info(
             f"FILLED {fill_event.timestamp} {fill_event.direction} {fill_event.quantity} {fill_event.symbol} "
-            f"@ {fill_event.fillPrice:.4f} (comm: {fill_event.commission}, slippage: {fill_event.slippage:.4f})"
+            f"@ {fill_event.fill_price:.4f} (comm: {fill_event.commission}, slippage: {fill_event.slippage:.4f})"
         )
 
         # Put the FillEvent onto the queue
-        self.eventsQueue.put(fill_event)
+        self.events.put(fill_event)

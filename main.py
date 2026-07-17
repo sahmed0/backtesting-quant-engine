@@ -1,22 +1,23 @@
-import os
-import sys
-import queue
 import asyncio
+import logging
+import os
+import queue
+import sys
 
+import performance
 from data import CSVDataHandler
-from strategy import SimpleMovingAverageStrategy
-from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
+from engine import Backtest
+from execution import SimulatedExecutionHandler
 from portfolio import Portfolio
 from position_sizing import (
+    ATRStopSizer,
     FixedSizer,
+    FractionalKellySizer,
     PercentEquitySizer,
     VolatilityTargetSizer,
-    ATRStopSizer,
-    FractionalKellySizer,
 )
-from execution import SimulatedExecutionHandler
-from engine import Backtest
-import performance
+from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
+from strategy import SimpleMovingAverageStrategy
 
 # Strategy to run: 'sma' (moving average crossover) or 'ou' (Ornstein-Uhlenbeck)
 STRATEGY = "sma"

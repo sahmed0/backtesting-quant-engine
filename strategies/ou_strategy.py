@@ -1,8 +1,7 @@
 from queue import Queue
-from typing import Optional
 
 import numpy as np
-from collections import deque
+
 from event import MarketEvent, SignalEvent
 from strategy import Strategy  # Assuming Abstract Base Class is defined
 
@@ -15,7 +14,7 @@ class OrnsteinUhlenbeckStrategy(Strategy):
 
     def __init__(
         self,
-        eventsQueue: Optional[Queue] = None,
+        events: Queue | None = None,
         symbol: str = "",
         window_size: int = 60,
         entry_z: float = 2.0,
@@ -24,7 +23,7 @@ class OrnsteinUhlenbeckStrategy(Strategy):
     ):
         """
         Args:
-            eventsQueue: The shared event queue. Generated signals are pushed
+            events: The shared event queue. Generated signals are pushed
                 onto it for the engine. May be None when the strategy is
                 exercised directly (e.g. in unit tests) and only the returned
                 signal is needed.
@@ -36,7 +35,7 @@ class OrnsteinUhlenbeckStrategy(Strategy):
                 only enters when price is below equilibrium. When True it also
                 shorts when price is above equilibrium.
         """
-        super().__init__(eventsQueue, allow_short)
+        super().__init__(events, allow_short)
         self.symbol = symbol
         self.window_size = window_size
         self.entry_z = entry_z
@@ -133,7 +132,7 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         # Push the signal onto the shared event queue so the engine's event
         # loop can route it to the portfolio. The signal is also returned for
         # callers that consume it directly (e.g. unit tests).
-        if signal is not None and self.eventsQueue is not None:
-            self.eventsQueue.put(signal)
+        if signal is not None and self.events is not None:
+            self.events.put(signal)
 
         return signal

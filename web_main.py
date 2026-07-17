@@ -1,26 +1,31 @@
-from pyscript import document, window
-from pyodide.ffi import create_proxy
 import asyncio
-import queue
-import os
 import csv
+import json
+import logging
+import os
+import queue
+import re
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from pyodide.ffi import create_proxy
+from pyscript import document, window
+
+import performance
 from data import CSVDataHandler
-from strategy import SimpleMovingAverageStrategy
-from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
+from engine import Backtest
+from execution import SimulatedExecutionHandler
+from execution import logger as execution_logger
 from portfolio import Portfolio
 from position_sizing import (
+    ATRStopSizer,
     FixedSizer,
+    FractionalKellySizer,
     PercentEquitySizer,
     VolatilityTargetSizer,
-    ATRStopSizer,
-    FractionalKellySizer,
 )
-from execution import SimulatedExecutionHandler
-from engine import Backtest
-import performance
+from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
+from strategy import SimpleMovingAverageStrategy
 
 
 def build_sizer(choice):
@@ -35,10 +40,6 @@ def build_sizer(choice):
         return FixedSizer(100.0)
     # Default: percent-of-equity.
     return PercentEquitySizer(fraction=0.1)
-
-
-import logging
-import re
 
 
 # Logging handler to push logs to the UI Table
@@ -98,8 +99,6 @@ class WebOrderBookHandler(logging.Handler):
 # Initialise the handler but don't attach yet
 ui_handler = WebOrderBookHandler("order-log-body")
 ui_handler.setFormatter(logging.Formatter("%(message)s"))
-from execution import logger as execution_logger
-
 execution_logger.addHandler(ui_handler)
 execution_logger.propagate = False  # Prevent double logging to console
 
@@ -135,10 +134,10 @@ async def _ensure_symbol(file_input, ticker_select):
 def _read_timestamps(csv_path):
     """Reads every bar's (tz-aware, UTC) timestamp from a symbol CSV, in order."""
     timestamps = []
-    with open(csv_path, mode="r", encoding="utf-8") as f:
+    with open(csv_path, encoding="utf-8") as f:
         for row in csv.DictReader(f):
             timestamps.append(
-                datetime.fromisoformat(row["timestamp"]).replace(tzinfo=timezone.utc)
+                datetime.fromisoformat(row["timestamp"]).replace(tzinfo=UTC)
             )
     return timestamps
 
@@ -283,8 +282,6 @@ async def analyse_overfitting(event):
             else None
         )
         _, oos_best_i, oos_best_j = oos_cells[0]
-
-        import json
 
         payload = {
             "symbol": symbol,
@@ -471,8 +468,6 @@ async def run_backtest(event):
             ).innerText = f"{stats['avg_trade_duration']:.1f} days"
 
             # Pass data to JS for charts
-            import json
-
             df = portfolio.generate_equity_curve()
             if not df.empty and "price" in df.columns:
                 timestamps = df["timestamp"].tolist()

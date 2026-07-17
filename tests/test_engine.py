@@ -1,9 +1,10 @@
 import asyncio
 import queue
-from unittest.mock import MagicMock
-from engine import Backtest
-from event import MarketEvent, SignalEvent, OrderEvent, FillEvent
 from datetime import datetime
+from unittest.mock import MagicMock
+
+from engine import Backtest
+from event import FillEvent, MarketEvent, OrderEvent, SignalEvent
 
 
 def test_engine_initialization():
@@ -14,13 +15,13 @@ def test_engine_initialization():
     q = queue.Queue()
 
     backtest = Backtest(
-        data_handler=dh, strategy=st, portfolio=pf, execution_handler=eh, event_queue=q
+        data_handler=dh, strategy=st, portfolio=pf, execution_handler=eh, events=q
     )
     assert backtest.data_handler == dh
     assert backtest.strategy == st
     assert backtest.portfolio == pf
     assert backtest.execution_handler == eh
-    assert backtest.queue == q
+    assert backtest.events == q
 
 
 def test_engine_run():
@@ -31,15 +32,15 @@ def test_engine_run():
     q = queue.Queue()
 
     # Configure data handler to run twice then stop
-    dh.shouldContinueBacktest = True
+    dh.continue_backtest = True
 
     def side_effect_update_bars():
         # Stop backtest on second call to prevent infinite loop
-        if dh.updateBars.call_count == 2:
-            dh.shouldContinueBacktest = False
+        if dh.update_bars.call_count == 2:
+            dh.continue_backtest = False
 
         # Add events to queue on first call
-        if dh.updateBars.call_count == 1:
+        if dh.update_bars.call_count == 1:
             q.put(
                 MarketEvent(
                     symbol="AAPL",
@@ -59,7 +60,7 @@ def test_engine_run():
                     timestamp=datetime.now(),
                     quantity=100,
                     direction="LONG",
-                    orderType="MARKET",
+                    order_type="MARKET",
                 )
             )
             q.put(
@@ -68,16 +69,16 @@ def test_engine_run():
                     timestamp=datetime.now(),
                     quantity=100,
                     direction="LONG",
-                    fillPrice=100.0,
+                    fill_price=100.0,
                     commission=1.0,
                     slippage=0.0,
                 )
             )
 
-    dh.updateBars.side_effect = side_effect_update_bars
+    dh.update_bars.side_effect = side_effect_update_bars
 
     backtest = Backtest(
-        data_handler=dh, strategy=st, portfolio=pf, execution_handler=eh, event_queue=q
+        data_handler=dh, strategy=st, portfolio=pf, execution_handler=eh, events=q
     )
     asyncio.run(backtest.run())
 
@@ -85,5 +86,5 @@ def test_engine_run():
     st.calculate_signals.assert_called_once()
     pf.update_timeindex.assert_called_once()
     pf.update_signal.assert_called_once()
-    eh.executeOrder.assert_called_once()
+    eh.execute_order.assert_called_once()
     pf.update_fill.assert_called_once()
