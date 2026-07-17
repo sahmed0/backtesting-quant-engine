@@ -7,6 +7,7 @@ pytest.importorskip("yfinance")
 from downloader import download_data
 
 
+@pytest.mark.network
 def test_market_data_file_formatting(tmp_path):
     """
     Test that downloaded market data files have the correct formatting
