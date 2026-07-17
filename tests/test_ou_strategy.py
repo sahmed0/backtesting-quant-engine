@@ -1,5 +1,7 @@
-import pytest
 from datetime import datetime
+
+import pytest
+
 from event import MarketEvent
 from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
 

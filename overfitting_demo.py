@@ -21,26 +21,22 @@ unseen data.
 Run:  python overfitting_demo.py [SYMBOL]   (default SYMBOL: AAPL)
 """
 
+import asyncio
 import csv
+import itertools
+import logging
 import os
 import queue
 import sys
-import asyncio
-import logging
-import itertools
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-# The execution handler logs every fill at INFO. Across a whole grid search
-# that is thousands of lines of noise, so quiet it to WARNING for the demo.
-logging.getLogger("execution").setLevel(logging.WARNING)
-
+import performance
 from data import CSVDataHandler
-from strategy import SimpleMovingAverageStrategy
+from engine import Backtest
+from execution import SimulatedExecutionHandler
 from portfolio import Portfolio
 from position_sizing import PercentEquitySizer
-from execution import SimulatedExecutionHandler
-from engine import Backtest
-import performance
+from strategy import SimpleMovingAverageStrategy
 
 # Parameter grid to search. Only pairs with short < long are valid crossovers.
 SHORT_WINDOWS = [5, 10, 15, 20]
@@ -56,10 +52,10 @@ INITIAL_CAPITAL = 100000.0
 def read_timestamps(csv_path: str) -> list[datetime]:
     """Reads the (tz-aware, UTC) timestamp of every bar, in file order."""
     timestamps: list[datetime] = []
-    with open(csv_path, mode="r", encoding="utf-8") as f:
+    with open(csv_path, encoding="utf-8") as f:
         for row in csv.DictReader(f):
             timestamps.append(
-                datetime.fromisoformat(row["timestamp"]).replace(tzinfo=timezone.utc)
+                datetime.fromisoformat(row["timestamp"]).replace(tzinfo=UTC)
             )
     return timestamps
 

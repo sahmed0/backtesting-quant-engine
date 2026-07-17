@@ -12,7 +12,7 @@ position, so the portfolio sizes those itself from the held quantity.
 
 from abc import ABC, abstractmethod
 from collections import deque
-from typing import TYPE_CHECKING, Deque, Dict, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -42,8 +42,8 @@ class PositionSizer(ABC):
         self,
         symbol: str,
         price: float,
-        high: Optional[float] = None,
-        low: Optional[float] = None,
+        high: float | None = None,
+        low: float | None = None,
     ) -> None:
         """
         Hook called by the portfolio on every market bar. The default is a
@@ -136,7 +136,7 @@ class VolatilityTargetSizer(PositionSizer):
         self.max_leverage = max_leverage
         # Per-symbol rolling price window. We keep lookback + 1 prices because
         # n returns require n + 1 prices.
-        self._prices: Dict[str, Deque[float]] = {}
+        self._prices: dict[str, deque[float]] = {}
 
     def update_market(self, symbol, price, high=None, low=None) -> None:
         buf = self._prices.get(symbol)
@@ -212,7 +212,7 @@ class ATRStopSizer(PositionSizer):
         self.max_leverage = max_leverage
         # Per-symbol rolling window of (high, low, close). atr_period True
         # Ranges need atr_period + 1 bars (each TR references the prior close).
-        self._bars: Dict[str, Deque[Tuple[float, float, float]]] = {}
+        self._bars: dict[str, deque[tuple[float, float, float]]] = {}
 
     def update_market(self, symbol, price, high=None, low=None) -> None:
         # Fall back to close when a feed lacks high/low; True Range then
@@ -225,7 +225,7 @@ class ATRStopSizer(PositionSizer):
             self._bars[symbol] = buf
         buf.append((bar_high, bar_low, price))
 
-    def _atr(self, symbol: str) -> Optional[float]:
+    def _atr(self, symbol: str) -> float | None:
         buf = self._bars.get(symbol)
         if buf is None or len(buf) < self.atr_period + 1:
             return None
@@ -306,14 +306,14 @@ class FractionalKellySizer(PositionSizer):
         self.max_fraction = max_fraction
 
     @staticmethod
-    def _completed_returns(trades: list, symbol: str) -> List[float]:
+    def _completed_returns(trades: list, symbol: str) -> list[float]:
         """
         Pairs each entry with the EXIT that closes it and returns the realised
         return of each round trip as a fraction of the entry notional, net of
         commission and slippage on both legs.
         """
-        returns: List[float] = []
-        open_entry: Optional[dict] = None
+        returns: list[float] = []
+        open_entry: dict | None = None
 
         for trade in trades:
             if trade["symbol"] != symbol:
@@ -343,7 +343,7 @@ class FractionalKellySizer(PositionSizer):
 
         return returns
 
-    def _kelly_fraction(self, returns: List[float]) -> float:
+    def _kelly_fraction(self, returns: list[float]) -> float:
         wins = [r for r in returns if r > 0]
         losses = [abs(r) for r in returns if r < 0]
 
