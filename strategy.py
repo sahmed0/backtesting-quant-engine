@@ -62,8 +62,9 @@ class SimpleMovingAverageStrategy(Strategy):
         # Maps symbol to a deque of its most recent closing prices
         self.prices: Dict[str, deque[float]] = {}
 
-        # Maps symbol to its current position state ('LONG' or None)
-        self.positions: Dict[str, Optional[Literal["LONG", "SHORT", "EXIT"]]] = {}
+        # Maps symbol to its current position state ('LONG', 'SHORT', or None
+        # when flat)
+        self.positions: dict[str, Literal["LONG", "SHORT"] | None] = {}
 
     def calculate_signals(self, event: MarketEvent) -> None:
         """
@@ -108,4 +109,4 @@ class SimpleMovingAverageStrategy(Strategy):
             elif not self.allow_short and current_position == "LONG":
                 # Long-only: simply flatten the existing long.
                 self.eventsQueue.put(SignalEvent(symbol, event.timestamp, "EXIT"))
-                self.positions[symbol] = "EXIT"
+                self.positions[symbol] = None
