@@ -40,7 +40,7 @@ class OrderEvent:
     timestamp: datetime
     quantity: float
     direction: Literal["LONG", "SHORT", "EXIT"]
-    orderType: Literal["MARKET", "LIMIT"]
+    order_type: Literal["MARKET", "LIMIT"]
     type: str = "ORDER"
 
 
@@ -54,7 +54,7 @@ class FillEvent:
     timestamp: datetime
     quantity: float
     direction: Literal["LONG", "SHORT", "EXIT"]
-    fillPrice: float
+    fill_price: float
     commission: float
     slippage: float
     type: str = "FILL"

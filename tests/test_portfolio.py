@@ -5,8 +5,9 @@ Tests for the portfolio module.
 import unittest
 from datetime import datetime
 from queue import Queue
+
+from event import FillEvent, MarketEvent, SignalEvent
 from portfolio import Portfolio
-from event import MarketEvent, SignalEvent, FillEvent
 
 
 class TestPortfolio(unittest.TestCase):
@@ -14,8 +15,8 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests that the portfolio initialises correctly.
         """
-        events_queue = Queue()
-        portfolio = Portfolio(events_queue=events_queue, initial_capital=50000.0)
+        events = Queue()
+        portfolio = Portfolio(events=events, initial_capital=50000.0)
         self.assertEqual(portfolio.initial_capital, 50000.0)
         self.assertEqual(portfolio.current_cash, 50000.0)
         self.assertEqual(portfolio.current_positions, {})
@@ -28,8 +29,8 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests that updating the timeindex correctly calculates holdings and equity.
         """
-        events_queue = Queue()
-        portfolio = Portfolio(events_queue=events_queue, initial_capital=100000.0)
+        events = Queue()
+        portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # Simulate an existing position
         portfolio.current_positions["AAPL"] = 10.0
@@ -64,15 +65,15 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests that SignalEvents enqueue valid OrderEvents based on rules.
         """
-        events_queue = Queue()
-        portfolio = Portfolio(events_queue=events_queue, initial_capital=100000.0)
+        events = Queue()
+        portfolio = Portfolio(events=events, initial_capital=100000.0)
         portfolio.current_prices["AAPL"] = 150.0  # Setup a price
 
         # Test valid LONG
         signal1 = SignalEvent("AAPL", datetime.now(), "LONG")
         portfolio.update_signal(signal1)
-        self.assertEqual(events_queue.qsize(), 1)
-        order1 = events_queue.get()
+        self.assertEqual(events.qsize(), 1)
+        order1 = events.get()
         self.assertEqual(order1.type, "ORDER")
         self.assertEqual(order1.direction, "LONG")
         self.assertEqual(order1.quantity, 100.0)
@@ -81,14 +82,14 @@ class TestPortfolio(unittest.TestCase):
         portfolio.current_cash = 100.0
         signal2 = SignalEvent("AAPL", datetime.now(), "LONG")
         portfolio.update_signal(signal2)
-        self.assertEqual(events_queue.qsize(), 0)  # Should not queue
+        self.assertEqual(events.qsize(), 0)  # Should not queue
 
         # Test valid EXIT
         portfolio.current_positions["AAPL"] = 50.0
         signal3 = SignalEvent("AAPL", datetime.now(), "EXIT")
         portfolio.update_signal(signal3)
-        self.assertEqual(events_queue.qsize(), 1)
-        order3 = events_queue.get()
+        self.assertEqual(events.qsize(), 1)
+        order3 = events.get()
         self.assertEqual(order3.direction, "EXIT")
         self.assertEqual(order3.quantity, 50.0)
 
@@ -96,14 +97,14 @@ class TestPortfolio(unittest.TestCase):
         portfolio.current_positions["AAPL"] = 0.0
         signal4 = SignalEvent("AAPL", datetime.now(), "EXIT")
         portfolio.update_signal(signal4)
-        self.assertEqual(events_queue.qsize(), 0)
+        self.assertEqual(events.qsize(), 0)
 
     def test_update_fill(self):
         """
         Tests updating positions and cash based on a fill.
         """
-        events_queue = Queue()
-        portfolio = Portfolio(events_queue=events_queue, initial_capital=100000.0)
+        events = Queue()
+        portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # Test LONG fill
         fill1 = FillEvent("AAPL", datetime.now(), 10.0, "LONG", 150.0, 5.0, 1.0)
@@ -123,8 +124,8 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests generating the equity curve DataFrame.
         """
-        events_queue = Queue()
-        portfolio = Portfolio(events_queue=events_queue, initial_capital=100000.0)
+        events = Queue()
+        portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # Empty curve
         df_empty = portfolio.generate_equity_curve()

@@ -2,13 +2,14 @@
 Portfolio module for the backtesting engine.
 """
 
-from typing import Dict, List, Any, Optional
 from queue import Queue
+from typing import Any
+
 import pandas as pd
 
 
-from event import MarketEvent, SignalEvent, OrderEvent, FillEvent
-from position_sizing import PositionSizer, FixedSizer
+from event import FillEvent, MarketEvent, OrderEvent, SignalEvent
+from position_sizing import FixedSizer, PositionSizer
 
 
 class Portfolio:
@@ -18,39 +19,39 @@ class Portfolio:
 
     def __init__(
         self,
-        events_queue: Queue,
+        events: Queue,
         initial_capital: float = 100000.0,
-        sizer: Optional[PositionSizer] = None,
+        sizer: PositionSizer | None = None,
     ):
         """
         Initialises the portfolio with a starting capital and a position sizer.
 
         Args:
-            events_queue: The shared event queue.
+            events: The shared event queue.
             initial_capital: Starting cash.
             sizer: Strategy for converting signals into order quantities. When
                 omitted, defaults to a fixed 100-unit size to preserve the
                 engine's original behaviour.
         """
-        self.events_queue = events_queue
+        self.events = events
         self.initial_capital = initial_capital
         self.sizer = sizer if sizer is not None else FixedSizer(100.0)
         self.current_cash = initial_capital
 
-        self.trades: List[Dict[str, Any]] = []
+        self.trades: list[dict[str, Any]] = []
 
         # symbol: quantity
-        self.current_positions: Dict[str, float] = {}
+        self.current_positions: dict[str, float] = {}
         # List of historical positions snapshots
-        self.all_positions: List[Dict[str, Any]] = []
+        self.all_positions: list[dict[str, Any]] = []
 
         # symbol: market_value
-        self.current_holdings: Dict[str, float] = {}
+        self.current_holdings: dict[str, float] = {}
         # List of historical holdings snapshots
-        self.all_holdings: List[Dict[str, Any]] = []
+        self.all_holdings: list[dict[str, Any]] = []
 
         # symbol: current_price
-        self.current_prices: Dict[str, float] = {}
+        self.current_prices: dict[str, float] = {}
 
     def update_timeindex(self, event: MarketEvent) -> None:
         """
@@ -133,9 +134,9 @@ class Portfolio:
                     timestamp=timestamp,
                     quantity=abs(current_qty),
                     direction="EXIT",
-                    orderType="MARKET",
+                    order_type="MARKET",
                 )
-                self.events_queue.put(order)
+                self.events.put(order)
             return
 
         # Size new entries via the configured position sizer. A non-positive
@@ -152,9 +153,9 @@ class Portfolio:
                     timestamp=timestamp,
                     quantity=order_quantity,
                     direction="LONG",
-                    orderType="MARKET",
+                    order_type="MARKET",
                 )
-                self.events_queue.put(order)
+                self.events.put(order)
 
         elif direction == "SHORT":
             # Opening a short sells shares we don't hold, which generates cash,
@@ -165,9 +166,9 @@ class Portfolio:
                     timestamp=timestamp,
                     quantity=order_quantity,
                     direction="SHORT",
-                    orderType="MARKET",
+                    order_type="MARKET",
                 )
-                self.events_queue.put(order)
+                self.events.put(order)
 
     def update_fill(self, event: FillEvent) -> None:
         """
@@ -176,7 +177,7 @@ class Portfolio:
         symbol = event.symbol
         quantity = event.quantity
         direction = event.direction
-        fill_price = event.fillPrice
+        fill_price = event.fill_price
         commission = event.commission
         slippage = event.slippage
 
