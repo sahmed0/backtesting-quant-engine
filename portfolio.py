@@ -6,7 +6,7 @@ from typing import Dict, List, Any, Optional
 from queue import Queue
 import pandas as pd
 
-# import polars as pl # deprecating in favor of Pandas to work with PyScript
+
 from event import MarketEvent, SignalEvent, OrderEvent, FillEvent
 from position_sizing import PositionSizer, FixedSizer
 
@@ -214,17 +214,6 @@ class Portfolio:
                 "slippage": slippage,
             }
         )
-
-    """
-    # POLARS VERSION - DEPRECATED IN FAVOR OF PANDAS DATEFRAME FOR BETTER COMPATIBILITY WITH PYSCRIPT
-    def generate_equity_curve(self) -> pl.DataFrame:
-        # Returns a Polars DataFrame of the total equity over time.
-        if not self.all_holdings:
-            return pl.DataFrame()
-            
-        df = pl.DataFrame(self.all_holdings)
-        return df.select(['timestamp', 'total'])
-        """
 
     def generate_equity_curve(self) -> pd.DataFrame:
         """

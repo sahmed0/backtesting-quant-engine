@@ -9,8 +9,6 @@ import logging
 from event import OrderEvent, FillEvent
 from data import DataHandler
 
-# Configure console logging
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 

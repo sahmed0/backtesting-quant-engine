@@ -49,6 +49,10 @@ def build_sizer():
 
 
 async def main_async():
+    # Library modules only ever call logger.info; the entry point decides that
+    # those records reach the console.
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
     # Initialise Queue
     events = queue.Queue()
 

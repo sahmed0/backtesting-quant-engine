@@ -112,6 +112,11 @@ def make_folds(n_bars: int):
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    # Every fold runs a full grid search; the execution handler's per-fill INFO
+    # logging would bury the fold table, so quiet it to WARNING.
+    logging.getLogger("execution").setLevel(logging.WARNING)
+
     symbol = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
     csv_path = os.path.join(DATA_DIR, f"{symbol}.csv")
     if not os.path.exists(csv_path):

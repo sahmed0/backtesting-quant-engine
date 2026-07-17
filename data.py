@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 import os
 import csv
 
-# import polars as pl # deprecating in favor of streaming CSV processing with built-in csv module
 from event import MarketEvent
 
 
@@ -70,25 +69,9 @@ class CSVDataHandler(DataHandler):
         self.symbolData: Dict[str, Iterator[Dict[str, Any]]] = {}
         self.latestSymbolData: Dict[str, Dict[str, Any]] = {}
 
-        self._loadData()
+        self._load_data()
 
-    """
-    # POLARS VERSION - DEPRECATED IN FAVOR OF STREAMING CSV PROCESSING WITH BUILT-IN CSV MODULE
-    def _loadData(self) -> None:
-        # Prepares the data generators to stream rows without overwhelming memory immediately.
-        for symbol in self.symbolList:
-            filePath = os.path.join(self.csvDir, f"{symbol}.csv")
-            
-            # Using lazy loading for optimising query plan before materialisation
-            # We then collect and convert to a row iterator for row-by-row streaming
-            lazyDf = pl.scan_csv(filePath)
-            df = lazyDf.collect()
-            
-            self.symbolData[symbol] = df.iter_rows(named=True)
-            self.latestSymbolData[symbol] = {}
-            """
-
-    def _loadData(self) -> None:
+    def _load_data(self) -> None:
         """
         Prepares the data generators to stream rows without overwhelming memory immediately.
         """
