@@ -5,7 +5,7 @@ Tests for the data handlers.
 import os
 import shutil
 import unittest
-from queue import Queue
+from collections import deque
 
 from data import CSVDataHandler
 
@@ -26,7 +26,7 @@ class TestCSVDataHandler(unittest.TestCase):
             f.write("2023-01-01T10:00:00,150.0,151.0,149.0,1000\n")
             f.write("2023-01-01T10:01:00,150.5,151.5,150.0,1500\n")
 
-        self.events = Queue()
+        self.events = deque()
         self.handler = CSVDataHandler(self.events, self.csv_dir, ["AAPL"])
 
     def tearDown(self):
@@ -45,8 +45,8 @@ class TestCSVDataHandler(unittest.TestCase):
 
         # First bar
         self.handler.update_bars()
-        self.assertEqual(self.events.qsize(), 1)
-        event1 = self.events.get()
+        self.assertEqual(len(self.events), 1)
+        event1 = self.events.popleft()
         self.assertEqual(event1.symbol, "AAPL")
         self.assertEqual(event1.close, 150.0)
 
@@ -57,8 +57,8 @@ class TestCSVDataHandler(unittest.TestCase):
 
         # Second bar
         self.handler.update_bars()
-        self.assertEqual(self.events.qsize(), 1)
-        event2 = self.events.get()
+        self.assertEqual(len(self.events), 1)
+        event2 = self.events.popleft()
         self.assertEqual(event2.close, 150.5)
 
         # No more data

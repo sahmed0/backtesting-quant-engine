@@ -1,6 +1,6 @@
 import unittest
 from datetime import UTC, datetime
-from queue import Queue
+from collections import deque
 
 from data import DataHandler
 from event import FillEvent, OrderEvent
@@ -24,7 +24,7 @@ class MockDataHandler(DataHandler):
 
 class TestSimulatedExecutionHandler(unittest.TestCase):
     def setUp(self):
-        self.events = Queue()
+        self.events = deque()
         # Mock price of 100.0 for easy calculation
         self.data_handler = MockDataHandler(price=100.0)
         self.execution_handler = SimulatedExecutionHandler(
@@ -43,9 +43,9 @@ class TestSimulatedExecutionHandler(unittest.TestCase):
         self.execution_handler.execute_order(order)
 
         # Check that one event was added to the queue
-        self.assertEqual(self.events.qsize(), 1)
+        self.assertEqual(len(self.events), 1)
 
-        fill_event = self.events.get()
+        fill_event = self.events.popleft()
         self.assertIsInstance(fill_event, FillEvent)
         self.assertEqual(fill_event.symbol, "AAPL")
         self.assertEqual(fill_event.direction, "LONG")
@@ -68,7 +68,7 @@ class TestSimulatedExecutionHandler(unittest.TestCase):
 
         self.execution_handler.execute_order(order)
 
-        fill_event = self.events.get()
+        fill_event = self.events.popleft()
 
         # 0.05% slippage on 100.0 is 0.05
         # SHORT trades should fill at a lower price (worse)
@@ -86,7 +86,7 @@ class TestSimulatedExecutionHandler(unittest.TestCase):
 
         self.execution_handler.execute_order(order)
 
-        fill_event = self.events.get()
+        fill_event = self.events.popleft()
 
         # EXIT trades default to neutral execution in this simulation
         self.assertAlmostEqual(fill_event.fill_price, 100.0, places=4)
