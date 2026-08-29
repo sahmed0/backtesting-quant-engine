@@ -4,9 +4,9 @@ Tests for the portfolio module.
 
 import unittest
 from datetime import datetime
-from queue import Queue
+from collections import deque
 
-from event import FillEvent, MarketEvent, SignalEvent
+from event import FillEvent, MarketEvent, OrderEvent, SignalEvent
 from portfolio import Portfolio
 
 
@@ -15,7 +15,7 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests that the portfolio initialises correctly.
         """
-        events = Queue()
+        events = deque()
         portfolio = Portfolio(events=events, initial_capital=50000.0)
         self.assertEqual(portfolio.initial_capital, 50000.0)
         self.assertEqual(portfolio.current_cash, 50000.0)
@@ -29,7 +29,7 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests that updating the timeindex correctly calculates holdings and equity.
         """
-        events = Queue()
+        events = deque()
         portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # Simulate an existing position
@@ -41,9 +41,10 @@ class TestPortfolio(unittest.TestCase):
         event = MarketEvent(
             symbol="AAPL",
             timestamp=event_time,
-            close=1500.0,
+            open=1495.0,
             high=1510.0,
             low=1490.0,
+            close=1500.0,
             volume=1000000.0,
         )
 
@@ -65,16 +66,16 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests that SignalEvents enqueue valid OrderEvents based on rules.
         """
-        events = Queue()
+        events = deque()
         portfolio = Portfolio(events=events, initial_capital=100000.0)
         portfolio.current_prices["AAPL"] = 150.0  # Setup a price
 
         # Test valid LONG
         signal1 = SignalEvent("AAPL", datetime.now(), "LONG")
         portfolio.update_signal(signal1)
-        self.assertEqual(events.qsize(), 1)
-        order1 = events.get()
-        self.assertEqual(order1.type, "ORDER")
+        self.assertEqual(len(events), 1)
+        order1 = events.popleft()
+        self.assertIsInstance(order1, OrderEvent)
         self.assertEqual(order1.direction, "LONG")
         self.assertEqual(order1.quantity, 100.0)
 
@@ -82,14 +83,14 @@ class TestPortfolio(unittest.TestCase):
         portfolio.current_cash = 100.0
         signal2 = SignalEvent("AAPL", datetime.now(), "LONG")
         portfolio.update_signal(signal2)
-        self.assertEqual(events.qsize(), 0)  # Should not queue
+        self.assertEqual(len(events), 0)  # Should not queue
 
         # Test valid EXIT
         portfolio.current_positions["AAPL"] = 50.0
         signal3 = SignalEvent("AAPL", datetime.now(), "EXIT")
         portfolio.update_signal(signal3)
-        self.assertEqual(events.qsize(), 1)
-        order3 = events.get()
+        self.assertEqual(len(events), 1)
+        order3 = events.popleft()
         self.assertEqual(order3.direction, "EXIT")
         self.assertEqual(order3.quantity, 50.0)
 
@@ -97,13 +98,13 @@ class TestPortfolio(unittest.TestCase):
         portfolio.current_positions["AAPL"] = 0.0
         signal4 = SignalEvent("AAPL", datetime.now(), "EXIT")
         portfolio.update_signal(signal4)
-        self.assertEqual(events.qsize(), 0)
+        self.assertEqual(len(events), 0)
 
     def test_update_fill(self):
         """
         Tests updating positions and cash based on a fill.
         """
-        events = Queue()
+        events = deque()
         portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # Test LONG fill
@@ -124,7 +125,7 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests generating the equity curve DataFrame.
         """
-        events = Queue()
+        events = deque()
         portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # Empty curve
