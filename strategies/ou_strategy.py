@@ -1,4 +1,5 @@
 from collections import deque
+from typing import Literal
 
 import numpy as np
 
@@ -25,8 +26,8 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         Args:
             events: The shared event queue. Generated signals are pushed
                 onto it for the engine. May be None when the strategy is
-                exercised directly (e.g. in unit tests) and only the returned
-                signal is needed.
+                exercised directly (e.g. in unit tests); callers then read the
+                signal off the queue.
             symbol: The ticker symbol being traded.
             window_size: Number of periods to use for OLS calibration.
             entry_z: The Z-score threshold to enter a trade.
@@ -42,8 +43,8 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         self.exit_z = exit_z
 
         # State tracking
-        self.prices = deque(maxlen=window_size)
-        self.invested = False  # 'LONG', 'SHORT', or False
+        self.prices: deque[float] = deque(maxlen=window_size)
+        self.invested: Literal["LONG", "SHORT", False] = False
 
     def _calibrate_ou_parameters(self) -> tuple[float, float, float]:
         """
@@ -81,7 +82,7 @@ class OrnsteinUhlenbeckStrategy(Strategy):
 
         return mu, sigma_eq, True
 
-    def calculate_signals(self, event: MarketEvent) -> SignalEvent | None:
+    def calculate_signals(self, event: MarketEvent) -> None:
         """
         Processes new market data and emits signals if thresholds are breached.
         """
@@ -130,9 +131,6 @@ class OrnsteinUhlenbeckStrategy(Strategy):
                 self.invested = False
 
         # Push the signal onto the shared event queue so the engine's event
-        # loop can route it to the portfolio. The signal is also returned for
-        # callers that consume it directly (e.g. unit tests).
-        if signal is not None and self.events is not None:
+        # loop can route it to the portfolio.
+        if signal is not None:
             self.events.append(signal)
-
-        return signal

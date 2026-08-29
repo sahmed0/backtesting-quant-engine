@@ -1,8 +1,9 @@
+from collections import deque
 from datetime import datetime
 
 import pytest
 
-from event import MarketEvent
+from event import Event, MarketEvent, SignalEvent
 from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
 
 
@@ -17,6 +18,7 @@ def create_market_event(price: float) -> MarketEvent:
     return MarketEvent(
         symbol="AAPL",
         timestamp=datetime.now(),
+        open=price,
         high=price,
         low=price,
         close=price,
@@ -24,13 +26,26 @@ def create_market_event(price: float) -> MarketEvent:
     )
 
 
+def feed(strategy, price):
+    """
+    Feeds one bar and returns the signal it emitted, or None.
+
+    The strategy appends signals to its queue rather than returning them (it
+    conforms to Strategy.calculate_signals -> None), so a bar that emits
+    nothing simply leaves the queue untouched.
+    """
+    before = len(strategy.events)
+    strategy.calculate_signals(create_market_event(price))
+    if len(strategy.events) == before:
+        return None
+    return strategy.events[-1]
+
+
 def test_strategy_warmup(base_strategy):
     """Ensure no signals are generated while the rolling window is filling."""
     # Feed it 9 prices (window size is 10)
     for i in range(9):
-        event = create_market_event(100.0 + i)
-        signal = base_strategy.calculate_signals(event)
-        assert signal is None
+        assert feed(base_strategy, 100.0 + i) is None
 
 
 def test_trending_rejection(base_strategy):
@@ -40,7 +55,7 @@ def test_trending_rejection(base_strategy):
     """
     # Create a strictly trending price series: 10, 20, 30, 40...
     for i in range(10):
-        base_strategy.calculate_signals(create_market_event(float((i + 1) * 10)))
+        feed(base_strategy, float((i + 1) * 10))
 
     # Manually trigger the calibration
     mu, sigma, is_mean_reverting = base_strategy._calibrate_ou_parameters()
@@ -63,21 +78,19 @@ def test_mean_reversion_signals():
     stable_prices = [100.1, 99.9, 100.2, 99.8, 100.1, 99.9, 100.0, 100.1, 99.9]
 
     for p in stable_prices:
-        strategy.calculate_signals(create_market_event(p))
+        feed(strategy, p)
 
     # 2. Spike the price to 110.0 (This is a massive > 2.0 Z-score move)
-    spike_event = create_market_event(110.0)
-    signal = strategy.calculate_signals(spike_event)
+    signal = feed(strategy, 110.0)
 
     # 3. Verify it wants to short the spike
     assert signal is not None
-    assert signal.type == "SIGNAL"
+    assert isinstance(signal, SignalEvent)
     assert signal.direction == "SHORT"
     assert strategy.invested == "SHORT"
 
     # 4. Crash the price back down to the mean (100.0)
-    mean_event = create_market_event(100.0)
-    exit_signal = strategy.calculate_signals(mean_event)
+    exit_signal = feed(strategy, 100.0)
 
     # 5. Verify it closed the trade
     assert exit_signal is not None
@@ -91,9 +104,47 @@ def test_long_only_ignores_spike():
 
     stable_prices = [100.1, 99.9, 100.2, 99.8, 100.1, 99.9, 100.0, 100.1, 99.9]
     for p in stable_prices:
-        strategy.calculate_signals(create_market_event(p))
+        feed(strategy, p)
 
-    signal = strategy.calculate_signals(create_market_event(110.0))
-
-    assert signal is None
+    assert feed(strategy, 110.0) is None
     assert strategy.invested is False
+
+
+def test_signals_reach_a_shared_queue():
+    """
+    When an events queue is supplied the engine sees the signal on it. This is
+    the path the engine actually uses; the tests above rely on the private
+    queue the base class creates when none is passed.
+    """
+    events: deque[Event] = deque()
+    strategy = OrnsteinUhlenbeckStrategy(
+        events, symbol="AAPL", window_size=10, entry_z=2.0, allow_short=True
+    )
+
+    for p in [100.1, 99.9, 100.2, 99.8, 100.1, 99.9, 100.0, 100.1, 99.9]:
+        strategy.calculate_signals(create_market_event(p))
+    assert len(events) == 0
+
+    strategy.calculate_signals(create_market_event(110.0))
+
+    assert len(events) == 1
+    signal = events[0]
+    assert isinstance(signal, SignalEvent)
+    assert signal.direction == "SHORT"
+
+
+def test_ignores_other_symbols(base_strategy):
+    """A bar for a different symbol must not enter the rolling window."""
+    other = MarketEvent(
+        symbol="MSFT",
+        timestamp=datetime.now(),
+        open=100.0,
+        high=100.0,
+        low=100.0,
+        close=100.0,
+        volume=100,
+    )
+    base_strategy.calculate_signals(other)
+
+    assert len(base_strategy.prices) == 0
+    assert len(base_strategy.events) == 0
