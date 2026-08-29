@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime
-from queue import Queue
+from collections import deque
 
 from event import MarketEvent, SignalEvent
 from strategy import SimpleMovingAverageStrategy
@@ -8,7 +8,7 @@ from strategy import SimpleMovingAverageStrategy
 
 class TestSimpleMovingAverageStrategy(unittest.TestCase):
     def setUp(self):
-        self.events = Queue()
+        self.events = deque()
         # Long-only by default; allow_short defaults to False.
         self.strategy = SimpleMovingAverageStrategy(
             self.events, short_window=2, long_window=4
@@ -23,9 +23,10 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
         return MarketEvent(
             symbol=self.symbol,
             timestamp=datetime.now(),
-            close=price,
+            open=price,
             high=price,
             low=price,
+            close=price,
             volume=100,
         )
 
@@ -34,15 +35,15 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
         for price in [10.0, 11.0, 12.0]:
             self.strategy.calculate_signals(self._create_market_event(price))
 
-        self.assertTrue(
-            self.events.empty(), "Should not emit signals during warm-up period"
+        self.assertEqual(
+            len(self.events), 0, "Should not emit signals during warm-up period"
         )
 
     def test_crossover_long(self):
         # Prices: 10, 10, 10, 10 -> MAs: short=10, long=10
         for price in [10.0, 10.0, 10.0, 10.0]:
             self.strategy.calculate_signals(self._create_market_event(price))
-        self.assertTrue(self.events.empty())
+        self.assertEqual(len(self.events), 0)
 
         # Price: 12 -> prices: [10, 10, 10, 12]
         # short_ma (last 2) = (10 + 12)/2 = 11
@@ -50,8 +51,8 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
         # 11 > 10.5, emit LONG
         self.strategy.calculate_signals(self._create_market_event(12.0))
 
-        self.assertFalse(self.events.empty())
-        event = self.events.get()
+        self.assertGreater(len(self.events), 0)
+        event = self.events.popleft()
         self.assertIsInstance(event, SignalEvent)
         self.assertEqual(event.direction, "LONG")
         self.assertEqual(event.symbol, self.symbol)
@@ -62,17 +63,16 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
         for price in [10.0, 10.0, 10.0, 10.0, 12.0]:
             self.strategy.calculate_signals(self._create_market_event(price))
 
-        while not self.events.empty():
-            self.events.get()
+        self.events.clear()
 
         # Price: 6 -> [10, 12, 8, 6] -> short_ma < long_ma -> EXIT only
         self.strategy.calculate_signals(self._create_market_event(8.0))
         self.strategy.calculate_signals(self._create_market_event(6.0))
 
-        self.assertFalse(self.events.empty())
-        event = self.events.get()
+        self.assertGreater(len(self.events), 0)
+        event = self.events.popleft()
         self.assertEqual(event.direction, "EXIT")
-        self.assertTrue(self.events.empty(), "Long-only strategy must not emit SHORT")
+        self.assertEqual(len(self.events), 0, "Long-only strategy must not emit SHORT")
 
     def test_crossover_flip_long_to_short(self):
         # Trigger LONG first
@@ -80,8 +80,7 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
             self.short_strategy.calculate_signals(self._create_market_event(price))
 
         # Empty the queue
-        while not self.events.empty():
-            self.events.get()
+        self.events.clear()
 
         # Prices are now: [10, 10, 10, 12] (maxlen 4) -> [10, 10, 12, 8]
         # Price: 8 -> short_ma = (12 + 8)/2 = 10
@@ -89,20 +88,20 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
         # Price: 6 -> [10, 12, 8, 6] -> short_ma = 7, long_ma = 9
         # 7 < 9, flip from LONG to SHORT: emit EXIT then SHORT
         self.short_strategy.calculate_signals(self._create_market_event(8.0))
-        self.assertTrue(self.events.empty())  # MAs are equal, no change
+        self.assertEqual(len(self.events), 0)  # MAs are equal, no change
 
         self.short_strategy.calculate_signals(self._create_market_event(6.0))
-        self.assertFalse(self.events.empty())
+        self.assertGreater(len(self.events), 0)
 
-        exit_event = self.events.get()
+        exit_event = self.events.popleft()
         self.assertEqual(exit_event.direction, "EXIT")
 
-        short_event = self.events.get()
+        short_event = self.events.popleft()
         self.assertIsInstance(short_event, SignalEvent)
         self.assertEqual(short_event.direction, "SHORT")
         self.assertEqual(short_event.symbol, self.symbol)
 
-        self.assertTrue(self.events.empty())
+        self.assertEqual(len(self.events), 0)
 
     def test_crossover_short_from_flat(self):
         # First fully-formed window already has short_ma < long_ma, so the
@@ -111,32 +110,31 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
             self.short_strategy.calculate_signals(self._create_market_event(price))
 
         # Prices: [10, 10, 10, 8] -> short_ma = 9, long_ma = 9.5 -> SHORT
-        self.assertFalse(self.events.empty())
-        event = self.events.get()
+        self.assertGreater(len(self.events), 0)
+        event = self.events.popleft()
         self.assertIsInstance(event, SignalEvent)
         self.assertEqual(event.direction, "SHORT")
-        self.assertTrue(self.events.empty())
+        self.assertEqual(len(self.events), 0)
 
     def test_crossover_flip_short_to_long(self):
         # Open a short from flat first.
         for price in [10.0, 10.0, 10.0, 8.0]:
             self.short_strategy.calculate_signals(self._create_market_event(price))
 
-        while not self.events.empty():
-            self.events.get()
+        self.events.clear()
 
         # Prices: [10, 10, 8] -> add 14 -> [10, 10, 8, 14]
         # short_ma = (8 + 14)/2 = 11, long_ma = (10 + 10 + 8 + 14)/4 = 10.5
         # 11 > 10.5, flip from SHORT to LONG: emit EXIT then LONG
         self.short_strategy.calculate_signals(self._create_market_event(14.0))
-        self.assertFalse(self.events.empty())
+        self.assertGreater(len(self.events), 0)
 
-        exit_event = self.events.get()
+        exit_event = self.events.popleft()
         self.assertEqual(exit_event.direction, "EXIT")
 
-        long_event = self.events.get()
+        long_event = self.events.popleft()
         self.assertEqual(long_event.direction, "LONG")
-        self.assertTrue(self.events.empty())
+        self.assertEqual(len(self.events), 0)
 
 
 if __name__ == "__main__":
