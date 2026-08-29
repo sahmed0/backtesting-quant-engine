@@ -4,10 +4,10 @@ Execution handler module for simulating order execution.
 
 import logging
 from abc import ABC, abstractmethod
-from queue import Queue
+from collections import deque
 
 from data import DataHandler
-from event import FillEvent, OrderEvent
+from event import Event, FillEvent, OrderEvent
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
     def __init__(
         self,
-        events: Queue,
+        events: deque[Event],
         data_handler: DataHandler,
         fixed_commission: float = 0.001,
         slippage_pct: float = 0.0005,
@@ -110,4 +110,4 @@ class SimulatedExecutionHandler(ExecutionHandler):
         )
 
         # Put the FillEvent onto the queue
-        self.events.put(fill_event)
+        self.events.append(fill_event)

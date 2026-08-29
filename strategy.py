@@ -4,10 +4,9 @@ Strategy module for the backtesting engine.
 
 from abc import ABC, abstractmethod
 from collections import deque
-from queue import Queue
 from typing import Literal
 
-from event import MarketEvent, SignalEvent
+from event import Event, MarketEvent, SignalEvent
 
 
 class Strategy(ABC):
@@ -15,7 +14,7 @@ class Strategy(ABC):
     Abstract base class for trading strategies.
     """
 
-    def __init__(self, events: Queue, allow_short: bool = False):
+    def __init__(self, events: deque[Event], allow_short: bool = False):
         """
         Initialises the strategy with the events queue.
 
@@ -48,7 +47,7 @@ class SimpleMovingAverageStrategy(Strategy):
 
     def __init__(
         self,
-        events: Queue,
+        events: deque[Event],
         short_window: int,
         long_window: int,
         allow_short: bool = False,
@@ -93,18 +92,18 @@ class SimpleMovingAverageStrategy(Strategy):
         if short_ma > long_ma and current_position != "LONG":
             # Cover any open short before going long.
             if current_position == "SHORT":
-                self.events.put(SignalEvent(symbol, event.timestamp, "EXIT"))
-            self.events.put(SignalEvent(symbol, event.timestamp, "LONG"))
+                self.events.append(SignalEvent(symbol, event.timestamp, "EXIT"))
+            self.events.append(SignalEvent(symbol, event.timestamp, "LONG"))
             self.positions[symbol] = "LONG"
 
         elif short_ma < long_ma:
             if self.allow_short and current_position != "SHORT":
                 # Close any open long before going short.
                 if current_position == "LONG":
-                    self.events.put(SignalEvent(symbol, event.timestamp, "EXIT"))
-                self.events.put(SignalEvent(symbol, event.timestamp, "SHORT"))
+                    self.events.append(SignalEvent(symbol, event.timestamp, "EXIT"))
+                self.events.append(SignalEvent(symbol, event.timestamp, "SHORT"))
                 self.positions[symbol] = "SHORT"
             elif not self.allow_short and current_position == "LONG":
                 # Long-only: simply flatten the existing long.
-                self.events.put(SignalEvent(symbol, event.timestamp, "EXIT"))
+                self.events.append(SignalEvent(symbol, event.timestamp, "EXIT"))
                 self.positions[symbol] = None

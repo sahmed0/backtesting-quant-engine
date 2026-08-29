@@ -1,12 +1,13 @@
 import asyncio
 import logging
 import os
-import queue
 import sys
+from collections import deque
 
 import performance
 from data import CSVDataHandler
 from engine import Backtest
+from event import Event
 from execution import SimulatedExecutionHandler
 from portfolio import Portfolio
 from position_sizing import (
@@ -55,7 +56,7 @@ async def main_async():
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     # Initialise Queue
-    events = queue.Queue()
+    events: deque[Event] = deque()
 
     # Set CSV Path
     csv_path = "data/AAPL.csv"

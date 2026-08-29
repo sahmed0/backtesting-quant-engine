@@ -26,13 +26,14 @@ import csv
 import itertools
 import logging
 import os
-import queue
 import sys
+from collections import deque
 from datetime import UTC, datetime
 
 import performance
 from data import CSVDataHandler
 from engine import Backtest
+from event import Event
 from execution import SimulatedExecutionHandler
 from portfolio import Portfolio
 from position_sizing import PercentEquitySizer
@@ -75,7 +76,7 @@ def split_dates(timestamps: list[datetime], fraction: float):
 
 async def _run_async(symbol, short_w, long_w, start, end) -> dict:
     """Runs a single backtest over [start, end] and returns its summary stats."""
-    events: queue.Queue = queue.Queue()
+    events: deque[Event] = deque()
     data_handler = CSVDataHandler(
         events, DATA_DIR, [symbol], start_date=start, end_date=end
     )
