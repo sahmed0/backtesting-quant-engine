@@ -1,5 +1,5 @@
 import asyncio
-import queue
+from collections import deque
 from datetime import datetime
 from unittest.mock import MagicMock
 
@@ -12,7 +12,7 @@ def test_engine_initialization():
     st = MagicMock()
     pf = MagicMock()
     eh = MagicMock()
-    q = queue.Queue()
+    q = deque()
 
     backtest = Backtest(
         data_handler=dh, strategy=st, portfolio=pf, execution_handler=eh, events=q
@@ -29,7 +29,7 @@ def test_engine_run():
     st = MagicMock()
     pf = MagicMock()
     eh = MagicMock()
-    q = queue.Queue()
+    q = deque()
 
     # Configure data handler to run twice then stop
     dh.continue_backtest = True
@@ -41,7 +41,7 @@ def test_engine_run():
 
         # Add events to queue on first call
         if dh.update_bars.call_count == 1:
-            q.put(
+            q.append(
                 MarketEvent(
                     symbol="AAPL",
                     timestamp=datetime.now(),
@@ -51,10 +51,10 @@ def test_engine_run():
                     volume=1000.0,
                 )
             )
-            q.put(
+            q.append(
                 SignalEvent(symbol="AAPL", timestamp=datetime.now(), direction="LONG")
             )
-            q.put(
+            q.append(
                 OrderEvent(
                     symbol="AAPL",
                     timestamp=datetime.now(),
@@ -63,7 +63,7 @@ def test_engine_run():
                     order_type="MARKET",
                 )
             )
-            q.put(
+            q.append(
                 FillEvent(
                     symbol="AAPL",
                     timestamp=datetime.now(),
