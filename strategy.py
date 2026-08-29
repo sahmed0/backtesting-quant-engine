@@ -14,17 +14,20 @@ class Strategy(ABC):
     Abstract base class for trading strategies.
     """
 
-    def __init__(self, events: deque[Event], allow_short: bool = False):
+    def __init__(self, events: deque[Event] | None = None, allow_short: bool = False):
         """
         Initialises the strategy with the events queue.
 
         Args:
-            events: The shared event queue.
+            events: The shared event queue. When omitted a private queue is
+                created, which lets a strategy be exercised directly (e.g. in
+                unit tests) without an engine; callers then read the signals
+                off it.
             allow_short: When False (the default) the strategy is long-only and
                 never emits SHORT signals. When True the strategy may open short
                 positions.
         """
-        self.events = events
+        self.events: deque[Event] = events if events is not None else deque()
         self.allow_short = allow_short
 
     @abstractmethod

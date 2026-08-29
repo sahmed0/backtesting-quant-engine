@@ -2,13 +2,13 @@ import unittest
 from datetime import datetime
 from collections import deque
 
-from event import MarketEvent, SignalEvent
+from event import Event, MarketEvent, SignalEvent
 from strategy import SimpleMovingAverageStrategy
 
 
 class TestSimpleMovingAverageStrategy(unittest.TestCase):
     def setUp(self):
-        self.events = deque()
+        self.events: deque[Event] = deque()
         # Long-only by default; allow_short defaults to False.
         self.strategy = SimpleMovingAverageStrategy(
             self.events, short_window=2, long_window=4
@@ -53,7 +53,7 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
 
         self.assertGreater(len(self.events), 0)
         event = self.events.popleft()
-        self.assertIsInstance(event, SignalEvent)
+        assert isinstance(event, SignalEvent)
         self.assertEqual(event.direction, "LONG")
         self.assertEqual(event.symbol, self.symbol)
 
@@ -97,7 +97,7 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
         self.assertEqual(exit_event.direction, "EXIT")
 
         short_event = self.events.popleft()
-        self.assertIsInstance(short_event, SignalEvent)
+        assert isinstance(short_event, SignalEvent)
         self.assertEqual(short_event.direction, "SHORT")
         self.assertEqual(short_event.symbol, self.symbol)
 
@@ -112,7 +112,7 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
         # Prices: [10, 10, 10, 8] -> short_ma = 9, long_ma = 9.5 -> SHORT
         self.assertGreater(len(self.events), 0)
         event = self.events.popleft()
-        self.assertIsInstance(event, SignalEvent)
+        assert isinstance(event, SignalEvent)
         self.assertEqual(event.direction, "SHORT")
         self.assertEqual(len(self.events), 0)
 
