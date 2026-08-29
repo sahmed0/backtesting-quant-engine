@@ -1,9 +1,9 @@
 import unittest
-from datetime import UTC, datetime
 from collections import deque
+from datetime import UTC, datetime
 
 from data import DataHandler
-from event import FillEvent, OrderEvent
+from event import FillEvent, MarketEvent, OrderEvent
 from execution import SimulatedExecutionHandler
 
 
@@ -15,8 +15,16 @@ class MockDataHandler(DataHandler):
     def __init__(self, price: float):
         self.price = price
 
-    def get_latest_bar(self, symbol: str) -> dict:
-        return {"close": self.price}
+    def get_latest_bar(self, symbol: str) -> MarketEvent | None:
+        return MarketEvent(
+            symbol=symbol,
+            timestamp=datetime.now(UTC),
+            open=self.price,
+            high=self.price,
+            low=self.price,
+            close=self.price,
+            volume=0.0,
+        )
 
     def update_bars(self) -> None:
         pass

@@ -8,7 +8,6 @@ from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Any
 
 from event import Event, MarketEvent
 
@@ -20,9 +19,10 @@ class DataHandler(ABC):
     """
 
     @abstractmethod
-    def get_latest_bar(self, symbol: str) -> dict[str, Any]:
+    def get_latest_bar(self, symbol: str) -> MarketEvent | None:
         """
-        Retrieves the most recent bar data for a given symbol to prevent lookahead bias.
+        Retrieves the most recent bar for a given symbol to prevent lookahead
+        bias. Returns None before the first bar has been read.
         """
         pass
 
@@ -37,6 +37,9 @@ class DataHandler(ABC):
 class CSVDataHandler(DataHandler):
     """
     Data handler for high-performance CSV processing.
+
+    Each row is parsed exactly once, at construction of the MarketEvent, and
+    every consumer reads the typed event rather than re-parsing strings.
     """
 
     def __init__(
@@ -67,8 +70,8 @@ class CSVDataHandler(DataHandler):
         self.end_date = end_date
 
         self.continue_backtest: bool = True
-        self.symbol_data: dict[str, Iterator[dict[str, Any]]] = {}
-        self.latest_symbol_data: dict[str, dict[str, Any]] = {}
+        self.symbol_data: dict[str, Iterator[MarketEvent]] = {}
+        self.latest_symbol_data: dict[str, MarketEvent | None] = {}
 
         self._load_data()
 
@@ -81,31 +84,40 @@ class CSVDataHandler(DataHandler):
 
             # Create a generator function to keep the file open
             # only while we are actually reading from it.
-            def make_row_generator(path):
+            def make_bar_generator(path: str, sym: str) -> Iterator[MarketEvent]:
                 with open(path, encoding="utf-8") as f:
                     reader = csv.DictReader(f)
                     for row in reader:
-                        # Apply the optional in-/out-of-sample date filter. Only
-                        # parse the timestamp when a bound is actually set.
-                        if self.start_date is not None or self.end_date is not None:
-                            ts = datetime.fromisoformat(row["timestamp"]).replace(
-                                tzinfo=UTC
-                            )
-                            if self.start_date is not None and ts < self.start_date:
-                                continue
-                            if self.end_date is not None and ts > self.end_date:
-                                continue
-                        yield row
+                        timestamp = datetime.fromisoformat(row["timestamp"]).replace(
+                            tzinfo=UTC
+                        )
+
+                        # Apply the optional in-/out-of-sample date filter.
+                        if self.start_date is not None and timestamp < self.start_date:
+                            continue
+                        if self.end_date is not None and timestamp > self.end_date:
+                            continue
+
+                        yield MarketEvent(
+                            symbol=sym,
+                            timestamp=timestamp,
+                            open=float(row["open"]),
+                            high=float(row["high"]),
+                            low=float(row["low"]),
+                            close=float(row["close"]),
+                            volume=float(row["volume"]),
+                        )
 
             # Create a streaming generator for each symbol
-            self.symbol_data[symbol] = make_row_generator(file_path)
-            self.latest_symbol_data[symbol] = {}
+            self.symbol_data[symbol] = make_bar_generator(file_path, symbol)
+            self.latest_symbol_data[symbol] = None
 
-    def get_latest_bar(self, symbol: str) -> dict[str, Any]:
+    def get_latest_bar(self, symbol: str) -> MarketEvent | None:
         """
-        Returns the last fetched bar for the specified symbol.
+        Returns the last fetched bar for the specified symbol, or None before
+        the first bar has been read.
         """
-        return self.latest_symbol_data.get(symbol, {})
+        return self.latest_symbol_data.get(symbol)
 
     def update_bars(self) -> None:
         """
@@ -113,28 +125,9 @@ class CSVDataHandler(DataHandler):
         """
         for symbol in self.symbols:
             try:
-                row = next(self.symbol_data[symbol])
-                self.latest_symbol_data[symbol] = row
-
-                timestamp_raw = row["timestamp"]
-
-                # Adapts to string or native datetime parsing
-                if isinstance(timestamp_raw, str):
-                    timestamp = datetime.fromisoformat(timestamp_raw).replace(
-                        tzinfo=UTC
-                    )
-                else:
-                    timestamp = timestamp_raw.replace(tzinfo=UTC)
-
-                event = MarketEvent(
-                    symbol=symbol,
-                    timestamp=timestamp,
-                    close=float(row["close"]),
-                    high=float(row["high"]),
-                    low=float(row["low"]),
-                    volume=float(row["volume"]),
-                )
-                self.events.append(event)
+                bar = next(self.symbol_data[symbol])
+                self.latest_symbol_data[symbol] = bar
+                self.events.append(bar)
 
             except StopIteration:
                 self.continue_backtest = False
