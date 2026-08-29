@@ -33,3 +33,33 @@ ignore = ["E501"]
 testpaths = ["tests"]
 pythonpath = ["."]
 markers = ["network: tests that hit external services; excluded in CI"]
+
+[tool.mypy]
+# Python min version is 3.11, but numpy's bundled stubs use PEP 695 `type`
+# statements, which mypy refuses to parse below 3.12, it aborts before
+# checking any project code. The runtime floor stays >=3.11; ruff's
+# target-version = "py311" is what guards against 3.12-only syntax.
+python_version = "3.12"
+check_untyped_defs = true
+# web_main.py is excluded because its pyscript/pyodide imports only resolve
+# inside the browser. .venv is excluded so `mypy .` does not walk site-packages.
+exclude = ["web_main\\.py", "\\.venv"]
+
+[[tool.mypy.overrides]]
+module = [
+    "event",
+    "engine",
+    "data",
+    "portfolio",
+    "execution",
+    "performance",
+    "position_sizing",
+    "strategy",
+    "strategies.*",
+]
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# Third-party packages that ship no type information.
+module = ["pandas.*", "yfinance.*", "tqdm.*"]
+ignore_missing_imports = true
