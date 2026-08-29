@@ -63,13 +63,13 @@ class SimulatedExecutionHandler(ExecutionHandler):
         latest_bar = self.data_handler.get_latest_bar(event.symbol)
 
         # If no bar data is available, we cannot execute the order in this simulation.
-        if not latest_bar or "close" not in latest_bar:
+        if latest_bar is None:
             logger.warning(
                 f"No price data available for {event.symbol}. Cannot execute order."
             )
             return
 
-        base_price = float(latest_bar["close"])
+        base_price = latest_bar.close
         direction = event.direction
 
         # Apply the configured slippage to the base price.
