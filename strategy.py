@@ -71,9 +71,6 @@ class SimpleMovingAverageStrategy(Strategy):
         """
         Calculates and emits SMA crossover signals.
         """
-        if event.type != "MARKET":
-            return
-
         symbol = event.symbol
         close_price = event.close
 
