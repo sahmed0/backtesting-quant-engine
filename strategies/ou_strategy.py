@@ -1,9 +1,8 @@
 from collections import deque
-from queue import Queue
 
 import numpy as np
 
-from event import MarketEvent, SignalEvent
+from event import Event, MarketEvent, SignalEvent
 from strategy import Strategy  # Assuming Abstract Base Class is defined
 
 
@@ -15,7 +14,7 @@ class OrnsteinUhlenbeckStrategy(Strategy):
 
     def __init__(
         self,
-        events: Queue | None = None,
+        events: deque[Event] | None = None,
         symbol: str = "",
         window_size: int = 60,
         entry_z: float = 2.0,
@@ -134,6 +133,6 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         # loop can route it to the portfolio. The signal is also returned for
         # callers that consume it directly (e.g. unit tests).
         if signal is not None and self.events is not None:
-            self.events.put(signal)
+            self.events.append(signal)
 
         return signal

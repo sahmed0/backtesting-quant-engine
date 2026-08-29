@@ -5,12 +5,12 @@ Data handler module for the backtesting engine.
 import csv
 import os
 from abc import ABC, abstractmethod
+from collections import deque
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from queue import Queue
 from typing import Any
 
-from event import MarketEvent
+from event import Event, MarketEvent
 
 
 class DataHandler(ABC):
@@ -41,7 +41,7 @@ class CSVDataHandler(DataHandler):
 
     def __init__(
         self,
-        events: Queue,
+        events: deque[Event],
         csv_dir: str,
         symbols: list[str],
         start_date: "datetime | None" = None,
@@ -134,7 +134,7 @@ class CSVDataHandler(DataHandler):
                     low=float(row["low"]),
                     volume=float(row["volume"]),
                 )
-                self.events.put(event)
+                self.events.append(event)
 
             except StopIteration:
                 self.continue_backtest = False

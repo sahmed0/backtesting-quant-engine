@@ -2,13 +2,13 @@
 Portfolio module for the backtesting engine.
 """
 
-from queue import Queue
+from collections import deque
 from typing import Any
 
 import pandas as pd
 
 
-from event import FillEvent, MarketEvent, OrderEvent, SignalEvent
+from event import Event, FillEvent, MarketEvent, OrderEvent, SignalEvent
 from position_sizing import FixedSizer, PositionSizer
 
 
@@ -19,7 +19,7 @@ class Portfolio:
 
     def __init__(
         self,
-        events: Queue,
+        events: deque[Event],
         initial_capital: float = 100000.0,
         sizer: PositionSizer | None = None,
     ):
@@ -136,7 +136,7 @@ class Portfolio:
                     direction="EXIT",
                     order_type="MARKET",
                 )
-                self.events.put(order)
+                self.events.append(order)
             return
 
         # Size new entries via the configured position sizer. A non-positive
@@ -155,7 +155,7 @@ class Portfolio:
                     direction="LONG",
                     order_type="MARKET",
                 )
-                self.events.put(order)
+                self.events.append(order)
 
         elif direction == "SHORT":
             # Opening a short sells shares we don't hold, which generates cash,
@@ -168,7 +168,7 @@ class Portfolio:
                     direction="SHORT",
                     order_type="MARKET",
                 )
-                self.events.put(order)
+                self.events.append(order)
 
     def update_fill(self, event: FillEvent) -> None:
         """

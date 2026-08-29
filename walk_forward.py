@@ -26,14 +26,15 @@ Run:  python walk_forward.py [SYMBOL]   (default SYMBOL: AAPL)
 import asyncio
 import logging
 import os
-import queue
 import sys
+from collections import deque
 
 import numpy as np
 
 import performance
 from data import CSVDataHandler
 from engine import Backtest
+from event import Event
 from execution import SimulatedExecutionHandler
 
 # Reuse the slicing-aware helpers and grid from the simple-split demo.
@@ -58,7 +59,7 @@ STEP = OOS_WINDOW
 
 async def _run_async(symbol, short_w, long_w, start, end) -> Portfolio:
     """Runs one backtest over [start, end] and returns the populated portfolio."""
-    events: queue.Queue = queue.Queue()
+    events: deque[Event] = deque()
     data_handler = CSVDataHandler(
         events, DATA_DIR, [symbol], start_date=start, end_date=end
     )

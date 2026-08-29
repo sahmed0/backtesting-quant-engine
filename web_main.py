@@ -3,9 +3,9 @@ import csv
 import json
 import logging
 import os
-import queue
 import re
 import traceback
+from collections import deque
 from datetime import UTC, datetime
 
 from pyodide.ffi import create_proxy
@@ -14,6 +14,7 @@ from pyscript import document, window
 import performance
 from data import CSVDataHandler
 from engine import Backtest
+from event import Event
 from execution import SimulatedExecutionHandler
 from execution import logger as execution_logger
 from portfolio import Portfolio
@@ -159,7 +160,7 @@ async def _grid_sharpe(
             if short_w >= long_w:
                 row.append(None)
                 continue
-            events = queue.Queue()
+            events: deque[Event] = deque()
             data_handler = CSVDataHandler(
                 events, "/data", [symbol], start_date=start, end_date=end
             )
@@ -378,7 +379,7 @@ async def run_backtest(event):
             return
 
         # Initialise backtest components
-        events = queue.Queue()
+        events: deque[Event] = deque()
         data_handler = CSVDataHandler(events, "/data", [symbol])
 
         # Select the strategy chosen in the UI
