@@ -60,9 +60,6 @@ class SimulatedExecutionHandler(ExecutionHandler):
         """
         Converts OrderEvent to FillEvent.
         """
-        if event.type != "ORDER":
-            return
-
         latest_bar = self.data_handler.get_latest_bar(event.symbol)
 
         # If no bar data is available, we cannot execute the order in this simulation.

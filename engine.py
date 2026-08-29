@@ -1,6 +1,10 @@
-import queue
-import time
-from typing import Any
+from collections import deque
+
+from data import DataHandler
+from event import Event, FillEvent, MarketEvent, OrderEvent, SignalEvent
+from execution import ExecutionHandler
+from portfolio import Portfolio
+from strategy import Strategy
 
 
 class Backtest:
@@ -11,11 +15,11 @@ class Backtest:
 
     def __init__(
         self,
-        data_handler: Any,
-        strategy: Any,
-        portfolio: Any,
-        execution_handler: Any,
-        events: queue.Queue,
+        data_handler: DataHandler,
+        strategy: Strategy,
+        portfolio: Portfolio,
+        execution_handler: ExecutionHandler,
+        events: deque[Event],
     ):
         """
         Initialises the backtest.
@@ -40,21 +44,16 @@ class Backtest:
         while self.data_handler.continue_backtest:
             self.data_handler.update_bars()
 
-            while True:
-                try:
-                    event = self.events.get(block=False)
-                except queue.Empty:
-                    break
-                else:
-                    if event is not None:
-                        if event.type == "MARKET":
-                            self.strategy.calculate_signals(event)
-                            self.portfolio.update_timeindex(event)
-                        elif event.type == "SIGNAL":
-                            self.portfolio.update_signal(event)
-                        elif event.type == "ORDER":
-                            self.execution_handler.execute_order(event)
-                        elif event.type == "FILL":
-                            self.portfolio.update_fill(event)
+            while self.events:
+                event = self.events.popleft()
 
-            time.sleep(0)
+                match event:
+                    case MarketEvent():
+                        self.strategy.calculate_signals(event)
+                        self.portfolio.update_timeindex(event)
+                    case SignalEvent():
+                        self.portfolio.update_signal(event)
+                    case OrderEvent():
+                        self.execution_handler.execute_order(event)
+                    case FillEvent():
+                        self.portfolio.update_fill(event)

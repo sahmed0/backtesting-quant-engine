@@ -86,8 +86,8 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         """
         Processes new market data and emits signals if thresholds are breached.
         """
-        # Ignore non-market events and events for other symbols
-        if event.type != "MARKET" or event.symbol != self.symbol:
+        # Ignore events for other symbols
+        if event.symbol != self.symbol:
             return None
 
         # Update our rolling window
