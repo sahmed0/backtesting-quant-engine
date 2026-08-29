@@ -64,7 +64,13 @@ class FixedSizer(PositionSizer):
     def __init__(self, quantity: float = 100.0):
         self.quantity = quantity
 
-    def size(self, symbol, direction, price, portfolio) -> float:
+    def size(
+        self,
+        symbol: str,
+        direction: Literal["LONG", "SHORT"],
+        price: float,
+        portfolio: "Portfolio",
+    ) -> float:
         return self.quantity
 
 
@@ -88,7 +94,13 @@ class PercentEquitySizer(PositionSizer):
             raise ValueError("fraction must be positive")
         self.fraction = fraction
 
-    def size(self, symbol, direction, price, portfolio) -> float:
+    def size(
+        self,
+        symbol: str,
+        direction: Literal["LONG", "SHORT"],
+        price: float,
+        portfolio: "Portfolio",
+    ) -> float:
         if price <= 0:
             return 0.0
         target_value = self.fraction * portfolio.total_equity()
@@ -138,14 +150,26 @@ class VolatilityTargetSizer(PositionSizer):
         # n returns require n + 1 prices.
         self._prices: dict[str, deque[float]] = {}
 
-    def update_market(self, symbol, price, high=None, low=None) -> None:
+    def update_market(
+        self,
+        symbol: str,
+        price: float,
+        high: float | None = None,
+        low: float | None = None,
+    ) -> None:
         buf = self._prices.get(symbol)
         if buf is None:
             buf = deque(maxlen=self.lookback + 1)
             self._prices[symbol] = buf
         buf.append(price)
 
-    def size(self, symbol, direction, price, portfolio) -> float:
+    def size(
+        self,
+        symbol: str,
+        direction: Literal["LONG", "SHORT"],
+        price: float,
+        portfolio: "Portfolio",
+    ) -> float:
         if price <= 0:
             return 0.0
 
@@ -214,7 +238,13 @@ class ATRStopSizer(PositionSizer):
         # Ranges need atr_period + 1 bars (each TR references the prior close).
         self._bars: dict[str, deque[tuple[float, float, float]]] = {}
 
-    def update_market(self, symbol, price, high=None, low=None) -> None:
+    def update_market(
+        self,
+        symbol: str,
+        price: float,
+        high: float | None = None,
+        low: float | None = None,
+    ) -> None:
         # Fall back to close when a feed lacks high/low; True Range then
         # degenerates to the close-to-close move, which is still usable.
         bar_high = high if high is not None else price
@@ -242,7 +272,13 @@ class ATRStopSizer(PositionSizer):
             true_ranges.append(true_range)
         return sum(true_ranges) / len(true_ranges)
 
-    def size(self, symbol, direction, price, portfolio) -> float:
+    def size(
+        self,
+        symbol: str,
+        direction: Literal["LONG", "SHORT"],
+        price: float,
+        portfolio: "Portfolio",
+    ) -> float:
         if price <= 0:
             return 0.0
 
@@ -359,7 +395,13 @@ class FractionalKellySizer(PositionSizer):
         payoff_ratio = avg_win / avg_loss
         return win_prob - (1.0 - win_prob) / payoff_ratio
 
-    def size(self, symbol, direction, price, portfolio) -> float:
+    def size(
+        self,
+        symbol: str,
+        direction: Literal["LONG", "SHORT"],
+        price: float,
+        portfolio: "Portfolio",
+    ) -> float:
         if price <= 0:
             return 0.0
 
