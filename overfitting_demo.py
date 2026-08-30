@@ -86,7 +86,7 @@ async def _run_async(symbol, short_w, long_w, start, end) -> dict:
     portfolio = Portfolio(
         events, initial_capital=INITIAL_CAPITAL, sizer=PercentEquitySizer(fraction=0.1)
     )
-    execution = SimulatedExecutionHandler(events, data_handler)
+    execution = SimulatedExecutionHandler(events, data_handler, portfolio)
     backtest = Backtest(data_handler, strategy, portfolio, execution, events)
     await backtest.run()
     return performance.create_summary_stats(portfolio)
