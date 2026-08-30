@@ -74,7 +74,7 @@ async def main_async():
     data_handler = CSVDataHandler(events, csv_dir, [symbol])
     strategy = build_strategy(events, symbol)
     portfolio = Portfolio(events, initial_capital=100000.0, sizer=build_sizer())
-    execution_handler = SimulatedExecutionHandler(events, data_handler)
+    execution_handler = SimulatedExecutionHandler(events, data_handler, portfolio)
     backtest = Backtest(data_handler, strategy, portfolio, execution_handler, events)
 
     # Run Backtest

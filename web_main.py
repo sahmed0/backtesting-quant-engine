@@ -173,6 +173,7 @@ async def _grid_sharpe(
             execution_handler = SimulatedExecutionHandler(
                 events,
                 data_handler,
+                portfolio,
                 fixed_commission=commission,
                 slippage_pct=slippage_pct,
             )
@@ -426,7 +427,11 @@ async def run_backtest(event):
             events, initial_capital=initial_capital, sizer=build_sizer(sizer_choice)
         )
         execution_handler = SimulatedExecutionHandler(
-            events, data_handler, fixed_commission=commission, slippage_pct=slippage_pct
+            events,
+            data_handler,
+            portfolio,
+            fixed_commission=commission,
+            slippage_pct=slippage_pct,
         )
         backtest = Backtest(
             data_handler, strategy, portfolio, execution_handler, events
