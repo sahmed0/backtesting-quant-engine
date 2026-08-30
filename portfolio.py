@@ -3,12 +3,20 @@ Portfolio module for the backtesting engine.
 """
 
 from collections import deque
-from typing import Any
+from datetime import datetime
+from typing import Any, Literal
 
 import pandas as pd
 
-
-from event import Event, FillEvent, MarketEvent, OrderEvent, SignalEvent
+from event import (
+    Event,
+    FailReason,
+    FillEvent,
+    MarketEvent,
+    OrderEvent,
+    OrderFailedEvent,
+    SignalEvent,
+)
 from position_sizing import FixedSizer, PositionSizer
 
 
@@ -117,6 +125,11 @@ class Portfolio:
     def update_signal(self, event: SignalEvent) -> None:
         """
         Acts on a SignalEvent to generate new orders based on the portfolio logic.
+
+        Affordability is deliberately *not* checked here. A signal is evaluated
+        off bar t's close but fills at bar t+1's open, so any cash check made
+        now would test a price the order will not receive. The check happens at
+        fill time in can_execute().
         """
         symbol = event.symbol
         direction = event.direction
@@ -128,47 +141,88 @@ class Portfolio:
             # Flatten whatever position exists, long or short. Exits are sized
             # from the held quantity, not the sizer.
             current_qty = self.current_positions.get(symbol, 0.0)
-            if current_qty != 0:
-                order = OrderEvent(
-                    symbol=symbol,
-                    timestamp=timestamp,
-                    quantity=abs(current_qty),
-                    direction="EXIT",
-                    order_type="MARKET",
-                )
-                self.events.append(order)
+            if current_qty == 0:
+                self._fail_order(symbol, timestamp, "EXIT", 0.0, "NO_POSITION")
+                return
+            order = OrderEvent(
+                symbol=symbol,
+                timestamp=timestamp,
+                quantity=abs(current_qty),
+                direction="EXIT",
+                order_type="MARKET",
+            )
+            self.events.append(order)
             return
 
         # Size new entries via the configured position sizer. A non-positive
         # quantity means the sizer declined to trade (e.g. insufficient history).
         order_quantity = self.sizer.size(symbol, direction, current_price, self)
         if order_quantity <= 0:
+            self._fail_order(symbol, timestamp, direction, 0.0, "SIZER_DECLINED")
             return
 
-        if direction == "LONG":
-            estimated_cost = order_quantity * current_price
-            if estimated_cost > 0 and self.current_cash >= estimated_cost:
-                order = OrderEvent(
-                    symbol=symbol,
-                    timestamp=timestamp,
-                    quantity=order_quantity,
-                    direction="LONG",
-                    order_type="MARKET",
-                )
-                self.events.append(order)
+        if current_price <= 0:
+            self._fail_order(symbol, timestamp, direction, order_quantity, "NO_PRICE")
+            return
 
-        elif direction == "SHORT":
-            # Opening a short sells shares we don't hold, which generates cash,
-            # so there is no up-front cash requirement to check here.
-            if current_price > 0:
-                order = OrderEvent(
-                    symbol=symbol,
-                    timestamp=timestamp,
-                    quantity=order_quantity,
-                    direction="SHORT",
-                    order_type="MARKET",
-                )
-                self.events.append(order)
+        self.events.append(
+            OrderEvent(
+                symbol=symbol,
+                timestamp=timestamp,
+                quantity=order_quantity,
+                direction=direction,
+                order_type="MARKET",
+            )
+        )
+
+    def _fail_order(
+        self,
+        symbol: str,
+        timestamp: datetime,
+        direction: Literal["LONG", "SHORT", "EXIT"],
+        quantity: float,
+        reason: FailReason,
+    ) -> None:
+        """
+        Queues an OrderFailedEvent so a dead order is never a silent drop.
+        """
+        self.events.append(
+            OrderFailedEvent(
+                symbol=symbol,
+                timestamp=timestamp,
+                direction=direction,
+                quantity=quantity,
+                reason=reason,
+            )
+        )
+
+    def can_execute(
+        self,
+        order: OrderEvent,
+        fill_price: float,
+        commission: float,
+        slippage: float,
+    ) -> tuple[bool, FailReason | None]:
+        """
+        Decides at fill time whether an order can be afforded.
+
+        Called by the execution handler once the actual fill price is known.
+        The whole order is rejected rather than clipped to what cash allows,
+        which keeps the fill either honest or absent.
+
+        The LONG arm mirrors exactly what update_fill charges, and the two must
+        be kept in lockstep. A SHORT generates cash rather than consuming it,
+        and an EXIT only flattens, so neither needs a check here.
+
+        Returns:
+            (True, None) if the order may fill, else (False, reason).
+        """
+        if order.direction == "LONG":
+            total_cost = fill_price * order.quantity + commission + slippage
+            if self.current_cash < total_cost:
+                return False, "INSUFFICIENT_CASH"
+
+        return True, None
 
     def update_fill(self, event: FillEvent) -> None:
         """
