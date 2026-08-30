@@ -5,11 +5,23 @@ Execution handler module for simulating order execution.
 import logging
 from abc import ABC, abstractmethod
 from collections import deque
+from datetime import datetime
+from typing import Literal
 
 from data import DataHandler
-from event import Event, FillEvent, OrderEvent
+from event import (
+    Event,
+    FailReason,
+    FillEvent,
+    MarketEvent,
+    OrderEvent,
+    OrderFailedEvent,
+)
+from portfolio import Portfolio
 
 logger = logging.getLogger(__name__)
+
+FillTiming = Literal["next_open", "same_close"]
 
 
 class ExecutionHandler(ABC):
@@ -21,93 +33,192 @@ class ExecutionHandler(ABC):
     @abstractmethod
     def execute_order(self, event: OrderEvent) -> None:
         """
-        Takes an OrderEvent and executes it, producing a FillEvent
-        that gets placed onto the events queue.
+        Takes an OrderEvent and accepts it for execution. Whether that produces
+        a fill immediately or on a later bar is the handler's business.
+        """
+        pass
+
+    @abstractmethod
+    def on_market(self, event: MarketEvent) -> None:
+        """
+        Called by the engine at the top of every bar, before the bar is marked
+        to market and before signals are evaluated. Handlers fill whatever they
+        accepted on earlier bars.
+        """
+        pass
+
+    @abstractmethod
+    def cancel_pending(self) -> None:
+        """
+        Called once by the engine after the final bar. Any order still waiting
+        for a fill will never get one, and dies here.
         """
         pass
 
 
 class SimulatedExecutionHandler(ExecutionHandler):
     """
-    Simulated execution handler that converts all order events into
-    fill events with simulated slippage and commission.
+    Simulated execution handler that converts order events into fill events
+    with simulated slippage and commission.
+
+    Market orders queue on the bar they are placed and fill at the *next* bar's
+    open. This is what keeps the engine honest: a signal computed from bar t's
+    close cannot transact at bar t's close, because at the moment the decision
+    is made that price is the last thing known, not the next thing tradeable.
     """
 
     def __init__(
         self,
         events: deque[Event],
         data_handler: DataHandler,
+        portfolio: Portfolio,
         fixed_commission: float = 0.001,
         slippage_pct: float = 0.0005,
+        fill_timing: FillTiming = "next_open",
     ):
         """
-        Initialises the handler, saving the events queue and data handler.
+        Initialises the handler.
 
         Args:
             events: The shared event queue.
-            data_handler: Supplies the latest bar used as the execution price.
+            data_handler: Supplies the latest bar, used as the execution price
+                in "same_close" mode only.
+            portfolio: Consulted at fill time for affordability.
             fixed_commission: Flat commission charged per fill.
             slippage_pct: Fraction the fill price moves against the order, e.g.
                 0.0005 for 5 bps. LONG fills pay more and SHORT fills receive
                 less; EXIT fills are modelled without slippage.
+            fill_timing: "next_open" (the honest default) queues orders to fill
+                at the next bar's open. "same_close" fills immediately at the
+                latest close, reproducing the look-ahead this engine used to
+                have. It exists solely so the fill-timing impact script can
+                measure what that look-ahead was worth, and must not be exposed
+                in the UI.
         """
         self.events = events
         self.data_handler = data_handler
+        self.portfolio = portfolio
         self.fixed_commission = fixed_commission
         self.slippage_pct = slippage_pct
+        self.fill_timing: FillTiming = fill_timing
+
+        self._pending: list[OrderEvent] = []
+        # Orders that never filled because the data ran out.
+        self.dropped_orders = 0
 
     def execute_order(self, event: OrderEvent) -> None:
         """
-        Converts OrderEvent to FillEvent.
+        Accepts an order. In "next_open" mode this only queues it; the fill
+        happens on the next bar. In "same_close" mode it fills at once.
         """
-        latest_bar = self.data_handler.get_latest_bar(event.symbol)
-
-        # If no bar data is available, we cannot execute the order in this simulation.
-        if latest_bar is None:
-            logger.warning(
-                f"No price data available for {event.symbol}. Cannot execute order."
-            )
+        if self.fill_timing == "next_open":
+            self._pending.append(event)
             return
 
-        base_price = latest_bar.close
-        direction = event.direction
+        latest_bar = self.data_handler.get_latest_bar(event.symbol)
+        if latest_bar is None:
+            self._fail(event, event.timestamp, "NO_PRICE")
+            return
+        self._try_fill(event, latest_bar.close, latest_bar.timestamp)
+
+    def on_market(self, event: MarketEvent) -> None:
+        """
+        Fills every order accepted on previous bars at this bar's open, in the
+        order they arrived.
+        """
+        if self.fill_timing != "next_open":
+            return
+
+        pending, self._pending = self._pending, []
+        for order in pending:
+            if order.symbol != event.symbol:
+                # Single-symbol engine, so this cannot happen; failing loudly
+                # beats filling an order at another instrument's price.
+                raise RuntimeError(
+                    f"Pending order for {order.symbol} but bar is for {event.symbol}"
+                )
+            self._try_fill(order, event.open, event.timestamp)
+
+    def cancel_pending(self) -> None:
+        """
+        Kills orders still waiting when the data ends. They are never filled at
+        the last close and the position is never force-flattened -- either would
+        invent a trade the strategy could not have made.
+        """
+        for order in self._pending:
+            self._fail(order, order.timestamp, "END_OF_DATA")
+            logger.info(
+                f"DROPPED {order.timestamp} {order.direction} {order.quantity} "
+                f"{order.symbol} (reason: END_OF_DATA)"
+            )
+        self.dropped_orders += len(self._pending)
+        self._pending = []
+
+    def _try_fill(
+        self, order: OrderEvent, base_price: float, timestamp: datetime
+    ) -> None:
+        """
+        Prices an order off base_price, asks the portfolio whether it is
+        affordable, and emits either a FillEvent or an OrderFailedEvent.
+
+        Shared by both fill timings so the cost maths and the affordability
+        check cannot drift apart between them.
+        """
+        direction = order.direction
 
         # Apply the configured slippage to the base price.
         # LONG: pay more (+slippage)
         # SHORT: receive less (-slippage)
-        # EXIT: For simplicity, assume worst-case execution if we don't know the exact side
-        # In a real system, EXIT would check current position to determine if it's a buy or sell.
-        slippage_pct = self.slippage_pct
-
+        # EXIT: no slippage in this simplified model.
         if direction == "LONG":
-            fill_price = base_price * (1 + slippage_pct)
+            fill_price = base_price * (1 + self.slippage_pct)
         elif direction == "SHORT":
-            fill_price = base_price * (1 - slippage_pct)
-        elif direction == "EXIT":
-            fill_price = (
-                base_price  # No slippage for EXIT orders in this simplified model
-            )
+            fill_price = base_price * (1 - self.slippage_pct)
         else:
             fill_price = base_price
 
+        commission = self.fixed_commission
         slippage_value = abs(fill_price - base_price)
 
-        # Create FillEvent
+        can_fill, reason = self.portfolio.can_execute(
+            order, fill_price, commission, slippage_value
+        )
+        if not can_fill:
+            assert reason is not None
+            self._fail(order, timestamp, reason)
+            logger.info(
+                f"REJECTED {timestamp} {direction} {order.quantity} {order.symbol} "
+                f"@ {fill_price:.4f} (reason: {reason})"
+            )
+            return
+
         fill_event = FillEvent(
-            symbol=event.symbol,
-            timestamp=event.timestamp,
-            quantity=event.quantity,
-            direction=event.direction,
+            symbol=order.symbol,
+            timestamp=timestamp,
+            quantity=order.quantity,
+            direction=direction,
             fill_price=fill_price,
-            commission=self.fixed_commission,
+            commission=commission,
             slippage=slippage_value,
         )
 
-        # Log the fill
         logger.info(
             f"FILLED {fill_event.timestamp} {fill_event.direction} {fill_event.quantity} {fill_event.symbol} "
             f"@ {fill_event.fill_price:.4f} (comm: {fill_event.commission}, slippage: {fill_event.slippage:.4f})"
         )
 
-        # Put the FillEvent onto the queue
         self.events.append(fill_event)
+
+    def _fail(self, order: OrderEvent, timestamp: datetime, reason: FailReason) -> None:
+        """
+        Queues an OrderFailedEvent for a dead order.
+        """
+        self.events.append(
+            OrderFailedEvent(
+                symbol=order.symbol,
+                timestamp=timestamp,
+                direction=order.direction,
+                quantity=order.quantity,
+                reason=reason,
+            )
+        )
