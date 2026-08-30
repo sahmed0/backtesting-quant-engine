@@ -22,8 +22,6 @@ class DataHandler(ABC):
     Provides an interface for fetching historical or live market data.
     """
 
-    continue_backtest: bool = True
-
     @abstractmethod
     def get_latest_bar(self, symbol: str) -> MarketEvent | None:
         """
@@ -33,9 +31,10 @@ class DataHandler(ABC):
         pass
 
     @abstractmethod
-    def update_bars(self) -> None:
+    def update_bars(self) -> MarketEvent | None:
         """
-        Pushes the latest bar to the events queue to drive the event loop.
+        Advances to the next bar and returns it, or returns None once the data
+        is exhausted. The engine drives its loop off this return value.
         """
         pass
 
@@ -76,13 +75,14 @@ class CSVDataHandler(DataHandler):
         if len(symbols) != 1:
             raise ValueError("CSVDataHandler supports exactly one symbol")
 
+        # Retained for construction-signature stability across call sites; the
+        # handler no longer queues anything (update_bars returns the bar).
         self.events = events
         self.csv_dir = csv_dir
         self.symbols = symbols
         self.start_date = start_date
         self.end_date = end_date
 
-        self.continue_backtest: bool = True
         self.symbol_data: dict[str, Iterator[MarketEvent]] = {}
         self.latest_symbol_data: dict[str, MarketEvent | None] = {}
 
@@ -148,15 +148,21 @@ class CSVDataHandler(DataHandler):
         """
         return self.latest_symbol_data.get(symbol)
 
-    def update_bars(self) -> None:
+    def update_bars(self) -> MarketEvent | None:
         """
-        Fetches the next row for all symbols and triggers a market event to drive the simulation.
-        """
-        for symbol in self.symbols:
-            try:
-                bar = next(self.symbol_data[symbol])
-                self.latest_symbol_data[symbol] = bar
-                self.events.append(bar)
+        Advances to the next bar and returns it, or None once the CSV is
+        exhausted.
 
-            except StopIteration:
-                self.continue_backtest = False
+        The bar is returned rather than queued: it is the engine's loop
+        condition, and market data is the one event with a single consumer
+        ordering (fills, then mark-to-market, then signals) that the engine
+        drives directly.
+        """
+        symbol = self.symbols[0]
+        try:
+            bar = next(self.symbol_data[symbol])
+        except StopIteration:
+            return None
+
+        self.latest_symbol_data[symbol] = bar
+        return bar
