@@ -111,6 +111,51 @@ def test_second_bar_does_not_refill_a_filled_order(handler, events, bars):
     assert len(events) == 0
 
 
+def test_pending_order_is_dropped_at_end_of_data(handler, events, bars):
+    handler.execute_order(_order(bars, bar_index=1))
+    handler.cancel_pending()
+
+    assert handler.dropped_orders == 1
+    assert len(events) == 1
+    failed = events.popleft()
+    assert isinstance(failed, OrderFailedEvent)
+    assert failed.reason == "END_OF_DATA"
+
+    # It is dropped, not filled at the last close, and not force-flattened.
+    handler.cancel_pending()
+    assert handler.dropped_orders == 1
+
+
+def test_fill_time_cash_rejection(events, bars, portfolio):
+    """
+    Cash is checked against the actual fill price, not the price that was on
+    screen when the signal fired.
+    """
+    # 10 shares at bar 0's close of 100 would cost ~1000 and look affordable.
+    # At bar 1's open of 110 the fill costs
+    #   110.055 * 10 + 0.001 + 0.055 = 1100.606 > 1050
+    portfolio.current_cash = 1050.0
+    handler = SimulatedExecutionHandler(
+        events,
+        InMemoryDataHandler(bars),
+        portfolio,
+        fixed_commission=COMMISSION,
+        slippage_pct=SLIPPAGE,
+    )
+
+    handler.execute_order(_order(bars))
+    handler.on_market(bars[1])
+
+    assert len(events) == 1
+    failed = events.popleft()
+    assert isinstance(failed, OrderFailedEvent)
+    assert failed.reason == "INSUFFICIENT_CASH"
+    assert failed.quantity == 10.0
+    # Rejection is all-or-nothing: no partial fill, nothing charged.
+    assert portfolio.current_positions.get("TEST", 0.0) == 0.0
+    assert portfolio.current_cash == 1050.0
+
+
 def test_orders_fill_fifo(handler, events, bars, portfolio):
     portfolio.current_positions["TEST"] = 10.0
     handler.execute_order(_order(bars, direction="EXIT"))
@@ -119,3 +164,45 @@ def test_orders_fill_fifo(handler, events, bars, portfolio):
 
     fills = [e for e in events if isinstance(e, FillEvent)]
     assert [f.direction for f in fills] == ["EXIT", "LONG"]
+
+
+def test_same_close_mode_fills_immediately_at_latest_close(events, bars, portfolio):
+    """
+    The look-ahead mode kept only for the fill-timing impact comparison. It still
+    runs the affordability check, so the only difference from next_open is when
+    the fill happens.
+    """
+    data_handler = InMemoryDataHandler(bars)
+    handler = SimulatedExecutionHandler(
+        events,
+        data_handler,
+        portfolio,
+        fixed_commission=COMMISSION,
+        slippage_pct=SLIPPAGE,
+        fill_timing="same_close",
+    )
+    data_handler.update_bars()  # bar 0 is now the latest bar
+
+    handler.execute_order(_order(bars))
+
+    assert len(events) == 1
+    fill = events.popleft()
+    assert isinstance(fill, FillEvent)
+    # Fills at bar 0's own close of 100 - the look-ahead, reproduced.
+    # BUY: 100 * (1 + 0.0005) = 100.05
+    assert fill.fill_price == pytest.approx(100.05)
+
+
+def test_same_close_mode_fails_with_no_price(events, bars, portfolio):
+    handler = SimulatedExecutionHandler(
+        events,
+        InMemoryDataHandler(bars),
+        portfolio,
+        fill_timing="same_close",
+    )
+    # No bar has been read, so there is no price to fill against.
+    handler.execute_order(_order(bars))
+
+    failed = events.popleft()
+    assert isinstance(failed, OrderFailedEvent)
+    assert failed.reason == "NO_PRICE"
