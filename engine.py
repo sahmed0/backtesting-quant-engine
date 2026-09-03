@@ -1,5 +1,7 @@
+import asyncio
 import logging
 from collections import deque
+from collections.abc import Callable
 
 from data import DataHandler
 from event import (
@@ -47,7 +49,11 @@ class Backtest:
         self.execution_handler = execution_handler
         self.events = events
 
-    async def run(self) -> None:
+    async def run(
+        self,
+        progress_cb: Callable[[int], None] | None = None,
+        yield_every: int = 250,
+    ) -> None:
         """
         Executes the backtest logic.
 
@@ -59,7 +65,15 @@ class Backtest:
 
         Because fills always happen at the open, before signals are evaluated at
         the close, a strategy can never transact at a price it used to decide.
+
+        Args:
+            progress_cb: Called with the number of bars processed, every
+                `yield_every` bars. The browser uses it to paint a counter.
+            yield_every: How many bars to process between yields to the event
+                loop. The engine is CPU-bound, so without this the browser tab
+                would freeze for the whole run.
         """
+        bars = 0
         while True:
             market = self.data_handler.update_bars()
             if market is None:
@@ -72,6 +86,12 @@ class Backtest:
 
             self.strategy.calculate_signals(market)
             self._drain()
+
+            bars += 1
+            if bars % yield_every == 0:
+                if progress_cb is not None:
+                    progress_cb(bars)
+                await asyncio.sleep(0)
 
         # The data ended. Anything still pending never gets a fill.
         self.execution_handler.cancel_pending()

@@ -141,6 +141,16 @@ def test_mark_to_market_reflects_the_fill_on_its_own_bar(bars):
     assert portfolio.all_holdings[1]["TEST"] == pytest.approx(0.0)
 
 
+def test_progress_callback_reports_bars(bars):
+    backtest, _, _, _ = _build(bars, signal_on=1)
+    seen: list[int] = []
+
+    asyncio.run(backtest.run(progress_cb=seen.append, yield_every=2))
+
+    # 5 bars, yielding every 2 -> callbacks after bars 2 and 4.
+    assert seen == [2, 4]
+
+
 def test_queued_market_event_is_rejected(bars):
     """Bars reach the engine as a return value; queueing one is a bug."""
     backtest, _, _, _ = _build(bars, signal_on=1)
