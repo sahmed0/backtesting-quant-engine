@@ -3,11 +3,19 @@ Tests for the portfolio module.
 """
 
 import unittest
-from datetime import datetime
 from collections import deque
+from datetime import datetime
 
-from event import FillEvent, MarketEvent, OrderEvent, SignalEvent
+from event import (
+    Event,
+    FillEvent,
+    MarketEvent,
+    OrderEvent,
+    OrderFailedEvent,
+    SignalEvent,
+)
 from portfolio import Portfolio
+from position_sizing import FixedSizer
 
 
 class TestPortfolio(unittest.TestCase):
@@ -66,7 +74,7 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests that SignalEvents enqueue valid OrderEvents based on rules.
         """
-        events = deque()
+        events: deque[Event] = deque()
         portfolio = Portfolio(events=events, initial_capital=100000.0)
         portfolio.current_prices["AAPL"] = 150.0  # Setup a price
 
@@ -75,15 +83,21 @@ class TestPortfolio(unittest.TestCase):
         portfolio.update_signal(signal1)
         self.assertEqual(len(events), 1)
         order1 = events.popleft()
-        self.assertIsInstance(order1, OrderEvent)
+        assert isinstance(order1, OrderEvent)
         self.assertEqual(order1.direction, "LONG")
         self.assertEqual(order1.quantity, 100.0)
 
-        # Test invalid LONG (not enough cash)
+        # A LONG that cash cannot cover is STILL ordered: affordability is no
+        # longer judged here, because the order will fill at the next bar's
+        # open, not at the price visible now. can_execute rejects it at fill
+        # time instead.
         portfolio.current_cash = 100.0
         signal2 = SignalEvent("AAPL", datetime.now(), "LONG")
         portfolio.update_signal(signal2)
-        self.assertEqual(len(events), 0)  # Should not queue
+        self.assertEqual(len(events), 1)
+        order2 = events.popleft()
+        assert isinstance(order2, OrderEvent)
+        self.assertEqual(order2.direction, "LONG")
 
         # Test valid EXIT
         portfolio.current_positions["AAPL"] = 50.0
@@ -91,14 +105,76 @@ class TestPortfolio(unittest.TestCase):
         portfolio.update_signal(signal3)
         self.assertEqual(len(events), 1)
         order3 = events.popleft()
+        assert isinstance(order3, OrderEvent)
         self.assertEqual(order3.direction, "EXIT")
         self.assertEqual(order3.quantity, 50.0)
 
-        # Test invalid EXIT (no shares)
+        # An EXIT with nothing to exit dies loudly rather than silently.
         portfolio.current_positions["AAPL"] = 0.0
         signal4 = SignalEvent("AAPL", datetime.now(), "EXIT")
         portfolio.update_signal(signal4)
-        self.assertEqual(len(events), 0)
+        self.assertEqual(len(events), 1)
+        failed = events.popleft()
+        assert isinstance(failed, OrderFailedEvent)
+        self.assertEqual(failed.reason, "NO_POSITION")
+
+    def test_update_signal_sizer_declined(self):
+        """
+        A sizer returning 0 must not silently swallow the signal.
+        """
+        events: deque[Event] = deque()
+        portfolio = Portfolio(
+            events=events, initial_capital=100000.0, sizer=FixedSizer(0.0)
+        )
+        portfolio.current_prices["AAPL"] = 150.0
+
+        portfolio.update_signal(SignalEvent("AAPL", datetime.now(), "LONG"))
+
+        self.assertEqual(len(events), 1)
+        failed = events.popleft()
+        assert isinstance(failed, OrderFailedEvent)
+        self.assertEqual(failed.reason, "SIZER_DECLINED")
+
+    def test_update_signal_no_price(self):
+        """
+        An entry signal for a symbol with no price yet cannot be sized honestly.
+        """
+        events: deque[Event] = deque()
+        portfolio = Portfolio(events=events, initial_capital=100000.0)
+        # current_prices has no AAPL entry, so it defaults to 0.0.
+
+        portfolio.update_signal(SignalEvent("AAPL", datetime.now(), "LONG"))
+
+        self.assertEqual(len(events), 1)
+        failed = events.popleft()
+        assert isinstance(failed, OrderFailedEvent)
+        self.assertEqual(failed.reason, "NO_PRICE")
+
+    def test_can_execute(self):
+        """
+        Fill-time affordability. The LONG arm mirrors exactly what update_fill
+        charges today: fill_price * qty + commission + slippage.
+        """
+        events: deque[Event] = deque()
+        portfolio = Portfolio(events=events, initial_capital=1000.0)
+        order = OrderEvent("AAPL", datetime.now(), 10.0, "LONG", "MARKET")
+
+        # Costs 99.0 * 10 + 1.0 + 0.5 = 991.5, and cash is 1000.0.
+        self.assertEqual(portfolio.can_execute(order, 99.0, 1.0, 0.5), (True, None))
+
+        # Costs 100.0 * 10 + 1.0 + 0.5 = 1001.5 > 1000.0.
+        self.assertEqual(
+            portfolio.can_execute(order, 100.0, 1.0, 0.5),
+            (False, "INSUFFICIENT_CASH"),
+        )
+
+        # Exactly affordable: 99.85 * 10 + 1.0 + 0.5 = 1000.0. Boundary is >=.
+        self.assertEqual(portfolio.can_execute(order, 99.85, 1.0, 0.5), (True, None))
+
+        # A SHORT generates cash rather than consuming it, so it is allowed even
+        # with the same cash that rejected the LONG.
+        short = OrderEvent("AAPL", datetime.now(), 10.0, "SHORT", "MARKET")
+        self.assertEqual(portfolio.can_execute(short, 100.0, 1.0, 0.5), (True, None))
 
     def test_update_fill(self):
         """
