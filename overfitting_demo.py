@@ -131,9 +131,11 @@ def _fmt_stats(stats: dict) -> str:
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    # The execution handler logs every fill at INFO. Across a whole grid search
-    # that is thousands of lines of noise, so quiet it to WARNING for the demo.
+    # The execution handler logs every fill at INFO, and the engine logs every
+    # failed order. Across a whole grid search that is thousands of lines of
+    # noise, so quiet both to WARNING for the demo.
     logging.getLogger("execution").setLevel(logging.WARNING)
+    logging.getLogger("engine").setLevel(logging.WARNING)
 
     symbol = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
     csv_path = os.path.join(DATA_DIR, f"{symbol}.csv")
