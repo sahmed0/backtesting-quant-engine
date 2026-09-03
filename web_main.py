@@ -437,8 +437,12 @@ async def run_backtest(event):
             data_handler, strategy, portfolio, execution_handler, events
         )
 
-        # Await the execution of the async backtest
-        await backtest.run()
+        # Await the execution of the async backtest. The engine yields to the
+        # browser periodically and calls back with its bar count.
+        def on_progress(bars: int) -> None:
+            status_el.innerText = f"Running... {bars} bars"
+
+        await backtest.run(progress_cb=on_progress)
 
         status_el.innerText = "Calculating performance..."
 
