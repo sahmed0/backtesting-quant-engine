@@ -212,6 +212,24 @@ class TestPortfolio(unittest.TestCase):
         # Revenue = 5*200 = 1000. - commission 5 = 995. Cash = 98495 + 995 = 99490.
         self.assertEqual(portfolio.current_cash, 99490.0)
 
+    def test_buy_fill_does_not_double_charge_slippage(self):
+        """
+        Regression for the removed double-count: a BUY fill must change cash by
+        exactly -(fill_price * qty + commission), with slippage untouched.
+        """
+        events: deque[Event] = deque()
+        portfolio = Portfolio(events=events, initial_capital=100000.0)
+
+        fill = FillEvent(
+            "AAPL", datetime.now(), 10.0, "LONG", 105.0525, 1.0, 0.525, "BUY"
+        )
+        portfolio.update_fill(fill)
+
+        # Exactly fill_price*qty + commission = 1050.525 + 1.0 = 1051.525.
+        self.assertAlmostEqual(
+            portfolio.current_cash, 100000.0 - (105.0525 * 10.0 + 1.0), places=9
+        )
+
     def test_generate_equity_curve(self):
         """
         Tests generating the equity curve DataFrame.
