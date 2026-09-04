@@ -127,6 +127,51 @@ def test_exit_of_a_long_sells_and_takes_slippage(handler, events, bars, portfoli
     assert fill.side == "SELL"
 
 
+def test_exit_covering_a_short_buys_and_takes_slippage(
+    handler, events, bars, portfolio
+):
+    """Covering a short is a BUY, so it pays slippage the other way."""
+    portfolio.current_positions["TEST"] = -10.0
+    handler.execute_order(_order(bars, direction="EXIT", side="BUY"))
+    handler.on_market(bars[1])
+
+    fill = events.popleft()
+    assert isinstance(fill, FillEvent)
+    # 110 * (1 + 0.0005) = 110.055
+    assert fill.fill_price == pytest.approx(110.055)
+    assert fill.slippage == pytest.approx(0.55)
+    assert fill.side == "BUY"
+
+
+def test_commission_hits_the_minimum_on_small_fills(handler, events, bars):
+    """10 shares * 0.005 = 0.05, floored to the 1.00 minimum."""
+    handler.execute_order(_order(bars, quantity=10.0))
+    handler.on_market(bars[1])
+
+    fill = events.popleft()
+    assert isinstance(fill, FillEvent)
+    assert fill.commission == pytest.approx(1.00)
+
+
+def test_commission_scales_with_quantity_above_the_minimum(events, bars):
+    """500 shares * 0.005 = 2.50, well above the 1.00 floor."""
+    portfolio = Portfolio(events, initial_capital=10_000_000.0)
+    handler = SimulatedExecutionHandler(
+        events,
+        InMemoryDataHandler(bars),
+        portfolio,
+        commission_per_share=COMMISSION_PER_SHARE,
+        min_commission=MIN_COMMISSION,
+        slippage_pct=SLIPPAGE,
+    )
+    handler.execute_order(_order(bars, quantity=500.0))
+    handler.on_market(bars[1])
+
+    fill = events.popleft()
+    assert isinstance(fill, FillEvent)
+    assert fill.commission == pytest.approx(2.50)
+
+
 def test_second_bar_does_not_refill_a_filled_order(handler, events, bars):
     """Pending orders are cleared once filled, not replayed on every bar."""
     handler.execute_order(_order(bars))

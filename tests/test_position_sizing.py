@@ -224,6 +224,19 @@ class TestFractionalKellySizer(unittest.TestCase):
         sizer = FractionalKellySizer(kelly_fraction=0.5, min_trades=10)
         self.assertEqual(sizer.size("AAPL", "LONG", 100.0, portfolio), 0.0)
 
+    def test_round_trip_cost_excludes_slippage(self):
+        # Slippage is already embedded in the fill prices, so the round-trip
+        # cost nets commissions only. Entry+exit each carry commission 1.0 and a
+        # (now report-only) slippage 5.0.
+        trades = [
+            make_trade("AAPL", "LONG", 10, 100.0, commission=1.0, slippage=5.0),
+            make_trade("AAPL", "EXIT", 10, 110.0, commission=1.0, slippage=5.0),
+        ]
+        returns = FractionalKellySizer._completed_returns(trades, "AAPL")
+        # gross = (110-100)*10 = 100; costs = 1.0 + 1.0 = 2.0 (no slippage);
+        # notional = 100*10 = 1000; net return = 98 / 1000 = 0.098.
+        self.assertAlmostEqual(returns[0], 0.098, places=9)
+
     def test_short_trades_scored_correctly(self):
         portfolio = Portfolio(events=deque(), initial_capital=100000.0)
         # Short entered at 100, covered at 90 -> a winning short (+10%).
