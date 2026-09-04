@@ -144,7 +144,14 @@ def _read_timestamps(csv_path):
 
 
 async def _grid_sharpe(
-    symbol, start, end, sizer_choice, initial_capital, commission, slippage_pct
+    symbol,
+    start,
+    end,
+    sizer_choice,
+    initial_capital,
+    commission_per_share,
+    min_commission,
+    slippage_pct,
 ):
     """
     Runs the SMA parameter grid over [start, end] and returns a 2D list of
@@ -174,7 +181,8 @@ async def _grid_sharpe(
                 events,
                 data_handler,
                 portfolio,
-                fixed_commission=commission,
+                commission_per_share=commission_per_share,
+                min_commission=min_commission,
                 slippage_pct=slippage_pct,
             )
             backtest = Backtest(
@@ -231,9 +239,12 @@ async def analyse_overfitting(event):
         initial_capital = float(document.getElementById("initial-capital").value)
         if initial_capital <= 0:
             raise ValueError("Initial capital must be greater than zero.")
-        commission = float(document.getElementById("commission").value)
+        commission_per_share = float(
+            document.getElementById("commission-per-share").value
+        )
+        min_commission = float(document.getElementById("min-commission").value)
         slippage_pct = float(document.getElementById("slippage").value) / 100.0
-        if commission < 0 or slippage_pct < 0:
+        if commission_per_share < 0 or min_commission < 0 or slippage_pct < 0:
             raise ValueError("Commission and slippage cannot be negative.")
 
         # Chronological 70/30 split, with no overlapping bar between the windows.
@@ -260,7 +271,8 @@ async def analyse_overfitting(event):
             is_end,
             sizer_choice,
             initial_capital,
-            commission,
+            commission_per_share,
+            min_commission,
             slippage_pct,
         )
         status_el.innerText = f"Analysing... {done_is}/{total}"
@@ -270,7 +282,8 @@ async def analyse_overfitting(event):
             oos_end,
             sizer_choice,
             initial_capital,
-            commission,
+            commission_per_share,
+            min_commission,
             slippage_pct,
         )
 
@@ -417,10 +430,13 @@ async def run_backtest(event):
         if initial_capital <= 0:
             raise ValueError("Initial capital must be greater than zero.")
 
-        commission = float(document.getElementById("commission").value)
+        commission_per_share = float(
+            document.getElementById("commission-per-share").value
+        )
+        min_commission = float(document.getElementById("min-commission").value)
         # Slippage is entered as a percentage in the UI; convert to a fraction.
         slippage_pct = float(document.getElementById("slippage").value) / 100.0
-        if commission < 0 or slippage_pct < 0:
+        if commission_per_share < 0 or min_commission < 0 or slippage_pct < 0:
             raise ValueError("Commission and slippage cannot be negative.")
 
         portfolio = Portfolio(
@@ -430,7 +446,8 @@ async def run_backtest(event):
             events,
             data_handler,
             portfolio,
-            fixed_commission=commission,
+            commission_per_share=commission_per_share,
+            min_commission=min_commission,
             slippage_pct=slippage_pct,
         )
         backtest = Backtest(
