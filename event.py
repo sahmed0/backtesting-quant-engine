@@ -36,6 +36,11 @@ class SignalEvent:
 class OrderEvent:
     """
     Handles the receipt of a new order to be sent to an execution system.
+
+    `direction` is the strategy's intent (LONG/SHORT/EXIT); `side` is what the
+    broker actually does with the shares (BUY/SELL). They differ on exits: an
+    EXIT that closes a long is a SELL, an EXIT that covers a short is a BUY.
+    Slippage and cash flows are driven by `side`, not `direction`.
     """
 
     symbol: str
@@ -43,6 +48,7 @@ class OrderEvent:
     quantity: float
     direction: Literal["LONG", "SHORT", "EXIT"]
     order_type: Literal["MARKET", "LIMIT"]
+    side: Literal["BUY", "SELL"]
 
 
 @dataclass(frozen=True)
@@ -53,6 +59,8 @@ class FillEvent:
     `timestamp` is the bar the order *filled* on, which is one bar later than
     the OrderEvent's timestamp: orders are placed off bar t's close and fill at
     bar t+1's open.
+
+    `direction` is the trade intent (LONG/SHORT/EXIT); `side` is BUY/SELL.
     """
 
     symbol: str
@@ -62,6 +70,7 @@ class FillEvent:
     fill_price: float
     commission: float
     slippage: float
+    side: Literal["BUY", "SELL"]
 
 
 # Why an order died. Every one of these reaches the strategy as an
