@@ -164,50 +164,53 @@ class TestPortfolio(unittest.TestCase):
 
     def test_can_execute(self):
         """
-        Fill-time affordability. The LONG arm mirrors exactly what update_fill
-        charges today: fill_price * qty + commission + slippage.
+        Fill-time affordability. The BUY arm mirrors exactly what update_fill
+        charges: fill_price * qty + commission. Slippage is already inside
+        fill_price, so the slippage argument is ignored here.
         """
         events: deque[Event] = deque()
         portfolio = Portfolio(events=events, initial_capital=1000.0)
         order = OrderEvent("AAPL", datetime.now(), 10.0, "LONG", "MARKET", "BUY")
 
-        # Costs 99.0 * 10 + 1.0 + 0.5 = 991.5, and cash is 1000.0.
+        # Costs 99.0 * 10 + 1.0 = 991.0, and cash is 1000.0. Slippage arg ignored.
         self.assertEqual(portfolio.can_execute(order, 99.0, 1.0, 0.5), (True, None))
 
-        # Costs 100.0 * 10 + 1.0 + 0.5 = 1001.5 > 1000.0.
+        # Costs 100.0 * 10 + 1.0 = 1001.0 > 1000.0.
         self.assertEqual(
             portfolio.can_execute(order, 100.0, 1.0, 0.5),
             (False, "INSUFFICIENT_CASH"),
         )
 
-        # Exactly affordable: 99.85 * 10 + 1.0 + 0.5 = 1000.0. Boundary is >=.
-        self.assertEqual(portfolio.can_execute(order, 99.85, 1.0, 0.5), (True, None))
+        # Exactly affordable: 99.9 * 10 + 1.0 = 1000.0. Boundary is >=.
+        self.assertEqual(portfolio.can_execute(order, 99.9, 1.0, 0.5), (True, None))
 
-        # A SHORT generates cash rather than consuming it, so it is allowed even
-        # with the same cash that rejected the LONG.
+        # A SHORT is a SELL, which brings cash in rather than consuming it, so
+        # it is allowed even with the cash that rejected the LONG.
         short = OrderEvent("AAPL", datetime.now(), 10.0, "SHORT", "MARKET", "SELL")
         self.assertEqual(portfolio.can_execute(short, 100.0, 1.0, 0.5), (True, None))
 
     def test_update_fill(self):
         """
-        Tests updating positions and cash based on a fill.
+        Tests updating positions and cash based on a fill. Cash moves by side,
+        and slippage is never charged again - it is already in fill_price.
         """
         events = deque()
         portfolio = Portfolio(events=events, initial_capital=100000.0)
 
-        # Test LONG fill
+        # BUY fill (LONG entry): pay fill_cost + commission only.
         fill1 = FillEvent("AAPL", datetime.now(), 10.0, "LONG", 150.0, 5.0, 1.0, "BUY")
         portfolio.update_fill(fill1)
         self.assertEqual(portfolio.current_positions["AAPL"], 10.0)
-        # Cost = 10*150 = 1500. Total = 1500+5+1 = 1506. Cash = 100000 - 1506 = 98494
-        self.assertEqual(portfolio.current_cash, 98494.0)
+        # Cost = 10*150 = 1500. + commission 5 = 1505. Cash = 100000 - 1505 = 98495.
+        # The slippage of 1.0 is NOT charged.
+        self.assertEqual(portfolio.current_cash, 98495.0)
 
-        # Test EXIT fill
+        # SELL fill (EXIT closing a long): receive fill_cost - commission.
         fill2 = FillEvent("AAPL", datetime.now(), 5.0, "EXIT", 200.0, 5.0, 1.0, "SELL")
         portfolio.update_fill(fill2)
         self.assertEqual(portfolio.current_positions["AAPL"], 5.0)
-        # Revenue = 5*200 = 1000. Cash increases by 1000 - 5 - 1 = 994. Cash = 98494 + 994 = 99488
-        self.assertEqual(portfolio.current_cash, 99488.0)
+        # Revenue = 5*200 = 1000. - commission 5 = 995. Cash = 98495 + 995 = 99490.
+        self.assertEqual(portfolio.current_cash, 99490.0)
 
     def test_generate_equity_curve(self):
         """

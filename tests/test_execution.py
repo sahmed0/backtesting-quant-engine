@@ -1,8 +1,12 @@
 """
 Tests for the simulated execution handler.
 
-The theme is timing: an order accepted on bar t must not fill on bar t, it must
-fill at bar t+1's open, and if there is no bar t+1 it must not fill at all.
+Two themes run through this file:
+  - Timing: an order accepted on bar t must not fill on bar t, it must fill at
+    bar t+1's open, and if there is no bar t+1 it must not fill at all.
+  - Cost: slippage is applied by trade *side* and embedded in
+    the fill price; commission is max(commission_per_share × qty, min_commission)
+    in total dollars; slippage is reported in total dollars but never charged.
 """
 
 from collections import deque
@@ -18,7 +22,8 @@ from portfolio import Portfolio
 Side = Literal["BUY", "SELL"]
 
 SLIPPAGE = 0.0005
-COMMISSION = 0.001
+COMMISSION_PER_SHARE = 0.005
+MIN_COMMISSION = 1.00
 
 
 @pytest.fixture
@@ -44,7 +49,8 @@ def handler(events, bars, portfolio):
         events,
         InMemoryDataHandler(bars),
         portfolio,
-        fixed_commission=COMMISSION,
+        commission_per_share=COMMISSION_PER_SHARE,
+        min_commission=MIN_COMMISSION,
         slippage_pct=SLIPPAGE,
     )
 
@@ -84,9 +90,13 @@ def test_order_fills_at_next_bar_open(handler, events, bars):
     fill = events.popleft()
     assert isinstance(fill, FillEvent)
     # Bar 1's open is 110, NOT bar 0's close of 100.
-    # LONG pays up: 110 * (1 + 0.0005) = 110.055
+    # BUY pays up: 110 * (1 + 0.0005) = 110.055
     assert fill.fill_price == pytest.approx(110.055)
-    assert fill.commission == pytest.approx(COMMISSION)
+    # slippage is total dollars: abs(110.055 - 110) * 10 = 0.55
+    assert fill.slippage == pytest.approx(0.55)
+    # commission = max(0.005 * 10, 1.00) = 1.00 (the floor bites at 10 shares)
+    assert fill.commission == pytest.approx(1.00)
+    assert fill.side == "BUY"
     # Stamped with the bar it filled on, not the bar it was placed on.
     assert fill.timestamp == bars[1].timestamp
 
@@ -97,20 +107,24 @@ def test_short_fill_receives_less_at_next_open(handler, events, bars):
 
     fill = events.popleft()
     assert isinstance(fill, FillEvent)
-    # SHORT receives less: 110 * (1 - 0.0005) = 109.945
+    # SELL receives less: 110 * (1 - 0.0005) = 109.945
     assert fill.fill_price == pytest.approx(109.945)
+    assert fill.slippage == pytest.approx(0.55)  # abs(109.945 - 110) * 10
+    assert fill.side == "SELL"
 
 
-def test_exit_fills_at_the_open_without_slippage(handler, events, bars, portfolio):
-    """EXITs carry no slippage in the current cost model; they still fill at the open."""
+def test_exit_of_a_long_sells_and_takes_slippage(handler, events, bars, portfolio):
+    """EXIT slippage by side: closing a long is a SELL, so it pays slippage."""
     portfolio.current_positions["TEST"] = 10.0
-    handler.execute_order(_order(bars, direction="EXIT"))
+    handler.execute_order(_order(bars, direction="EXIT", side="SELL"))
     handler.on_market(bars[1])
 
     fill = events.popleft()
     assert isinstance(fill, FillEvent)
-    assert fill.fill_price == pytest.approx(110.0)
-    assert fill.slippage == pytest.approx(0.0)
+    # 110 * (1 - 0.0005) = 109.945
+    assert fill.fill_price == pytest.approx(109.945)
+    assert fill.slippage == pytest.approx(0.55)
+    assert fill.side == "SELL"
 
 
 def test_second_bar_does_not_refill_a_filled_order(handler, events, bars):
@@ -142,17 +156,19 @@ def test_pending_order_is_dropped_at_end_of_data(handler, events, bars):
 def test_fill_time_cash_rejection(events, bars, portfolio):
     """
     Cash is checked against the actual fill price, not the price that was on
-    screen when the signal fired.
+    screen when the signal fired. Slippage is already inside the fill price and
+    is not added on top of the requirement.
     """
     # 10 shares at bar 0's close of 100 would cost ~1000 and look affordable.
-    # At bar 1's open of 110 the fill costs
-    #   110.055 * 10 + 0.001 + 0.055 = 1100.606 > 1050
+    # At bar 1's open of 110 the BUY costs
+    #   110.055 * 10 + 1.00 (commission) = 1101.55 > 1050
     portfolio.current_cash = 1050.0
     handler = SimulatedExecutionHandler(
         events,
         InMemoryDataHandler(bars),
         portfolio,
-        fixed_commission=COMMISSION,
+        commission_per_share=COMMISSION_PER_SHARE,
+        min_commission=MIN_COMMISSION,
         slippage_pct=SLIPPAGE,
     )
 
@@ -171,7 +187,7 @@ def test_fill_time_cash_rejection(events, bars, portfolio):
 
 def test_orders_fill_fifo(handler, events, bars, portfolio):
     portfolio.current_positions["TEST"] = 10.0
-    handler.execute_order(_order(bars, direction="EXIT"))
+    handler.execute_order(_order(bars, direction="EXIT", side="SELL"))
     handler.execute_order(_order(bars, direction="LONG"))
     handler.on_market(bars[1])
 
@@ -190,7 +206,8 @@ def test_same_close_mode_fills_immediately_at_latest_close(events, bars, portfol
         events,
         data_handler,
         portfolio,
-        fixed_commission=COMMISSION,
+        commission_per_share=COMMISSION_PER_SHARE,
+        min_commission=MIN_COMMISSION,
         slippage_pct=SLIPPAGE,
         fill_timing="same_close",
     )

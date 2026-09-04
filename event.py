@@ -60,6 +60,14 @@ class FillEvent:
     the OrderEvent's timestamp: orders are placed off bar t's close and fill at
     bar t+1's open.
 
+    Cost units are fixed and must not be re-interpreted by any consumer:
+      - `fill_price` is a **per-share** price with slippage already embedded
+        (BUY paid `open × (1 + s)`, SELL received `open × (1 − s)`).
+      - `commission` is **total dollars** for the fill.
+      - `slippage` is **total dollars**, for reporting only. The portfolio
+        charges exactly `fill_price × qty ± commission` and never subtracts
+        slippage again - it is already inside `fill_price`.
+
     `direction` is the trade intent (LONG/SHORT/EXIT); `side` is BUY/SELL.
     """
 

@@ -72,7 +72,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
         events: deque[Event],
         data_handler: DataHandler,
         portfolio: Portfolio,
-        fixed_commission: float = 0.001,
+        commission_per_share: float = 0.005,
+        min_commission: float = 1.00,
         slippage_pct: float = 0.0005,
         fill_timing: FillTiming = "next_open",
     ):
@@ -84,10 +85,14 @@ class SimulatedExecutionHandler(ExecutionHandler):
             data_handler: Supplies the latest bar, used as the execution price
                 in "same_close" mode only.
             portfolio: Consulted at fill time for affordability.
-            fixed_commission: Flat commission charged per fill.
+            commission_per_share: Dollars charged per share filled. The
+                actual commission is max(commission_per_share × qty,
+                min_commission) in total dollars per fill.
+            min_commission: Floor on the per-fill commission in dollars.
             slippage_pct: Fraction the fill price moves against the order, e.g.
-                0.0005 for 5 bps. LONG fills pay more and SHORT fills receive
-                less; EXIT fills are modelled without slippage.
+                0.0005 for 5 bps. Applied by trade *side*: a BUY pays more
+                (open × (1 + s)), a SELL receives less (open × (1 − s)). EXITs
+                are BUYs or SELLs like any other fill, so they carry slippage too.
             fill_timing: "next_open" (the honest default) queues orders to fill
                 at the next bar's open. "same_close" fills immediately at the
                 latest close, reproducing the look-ahead this engine used to
@@ -98,7 +103,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self.events = events
         self.data_handler = data_handler
         self.portfolio = portfolio
-        self.fixed_commission = fixed_commission
+        self.commission_per_share = commission_per_share
+        self.min_commission = min_commission
         self.slippage_pct = slippage_pct
         self.fill_timing: FillTiming = fill_timing
 
@@ -142,7 +148,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
     def cancel_pending(self) -> None:
         """
         Kills orders still waiting when the data ends. They are never filled at
-        the last close and the position is never force-flattened -- either would
+        the last close and the position is never force-flattened - either would
         invent a trade the strategy could not have made.
         """
         for order in self._pending:
@@ -167,19 +173,21 @@ class SimulatedExecutionHandler(ExecutionHandler):
         direction = order.direction
         side = order.side
 
-        # Apply the configured slippage to the base price.
-        # LONG: pay more (+slippage)
-        # SHORT: receive less (-slippage)
-        # EXIT: no slippage in this simplified model.
-        if direction == "LONG":
+        # Apply the configured slippage by trade side:
+        #   BUY  pays more:     base × (1 + slippage_pct)
+        #   SELL receives less: base × (1 − slippage_pct)
+        # This holds for EXITs too - an EXIT is a BUY (cover) or a SELL (close).
+        if side == "BUY":
             fill_price = base_price * (1 + self.slippage_pct)
-        elif direction == "SHORT":
+        else:  # SELL
             fill_price = base_price * (1 - self.slippage_pct)
-        else:
-            fill_price = base_price
 
-        commission = self.fixed_commission
-        slippage_value = abs(fill_price - base_price)
+        # Commission is total dollars per fill; slippage is total dollars, for
+        # reporting only - it is already embedded in fill_price above.
+        commission = max(
+            self.commission_per_share * order.quantity, self.min_commission
+        )
+        slippage_value = abs(fill_price - base_price) * order.quantity
 
         can_fill, reason = self.portfolio.can_execute(
             order, fill_price, commission, slippage_value

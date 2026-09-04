@@ -213,16 +213,17 @@ class Portfolio:
         The whole order is rejected rather than clipped to what cash allows,
         which keeps the fill either honest or absent.
 
-        The LONG arm mirrors exactly what update_fill charges, and the two must
-        be kept in lockstep. A SHORT generates cash rather than consuming it,
-        and an EXIT only flattens, so neither needs a check here.
+        The BUY arm mirrors exactly what update_fill charges, and the two must
+        be kept in lockstep. Slippage is already inside `fill_price`, so it is
+        never added again; the `slippage` argument is accepted only so the
+        signature matches the fill path, and is unused here. A SELL brings cash
+        in rather than consuming it, so it needs no check.
 
         Returns:
             (True, None) if the order may fill, else (False, reason).
         """
-        if order.direction == "LONG":
-            total_cost = fill_price * order.quantity + commission + slippage
-            if self.current_cash < total_cost:
+        if order.side == "BUY":
+            if self.current_cash < fill_price * order.quantity + commission:
                 return False, "INSUFFICIENT_CASH"
 
         return True, None
@@ -240,27 +241,19 @@ class Portfolio:
         slippage = event.slippage
 
         fill_cost = fill_price * quantity
-        total_cost = fill_cost + commission + slippage
 
         if symbol not in self.current_positions:
             self.current_positions[symbol] = 0.0
 
-        if direction == "LONG":
+        # Cash follows the side the shares actually moved, so an exit is priced
+        # like any other buy or sell. Slippage is already baked into fill_price
+        # and is never charged again here.
+        if side == "BUY":
             self.current_positions[symbol] += quantity
-            self.current_cash -= total_cost
-        elif direction == "SHORT":
-            # Opening/adding to a short: sell shares and receive the proceeds
-            # net of transaction costs.
+            self.current_cash -= fill_cost + commission
+        else:  # SELL
             self.current_positions[symbol] -= quantity
-            self.current_cash += fill_cost - commission - slippage
-        elif direction == "EXIT":
-            # Closing a position: sell to close a long, or buy to cover a short.
-            if self.current_positions[symbol] >= 0:
-                self.current_positions[symbol] -= quantity
-                self.current_cash += fill_cost - commission - slippage
-            else:
-                self.current_positions[symbol] += quantity
-                self.current_cash -= total_cost
+            self.current_cash += fill_cost - commission
 
         self.trades.append(
             {
