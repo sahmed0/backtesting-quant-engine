@@ -346,7 +346,8 @@ class FractionalKellySizer(PositionSizer):
         """
         Pairs each entry with the EXIT that closes it and returns the realised
         return of each round trip as a fraction of the entry notional, net of
-        commission and slippage on both legs.
+        commission on both legs. Slippage is not subtracted: it is already
+        embedded in the fill prices, so charging it here would count it twice.
         """
         returns: list[float] = []
         open_entry: dict | None = None
@@ -368,12 +369,7 @@ class FractionalKellySizer(PositionSizer):
                 gross = (trade["price"] - entry_price) * quantity
                 if open_entry["direction"] == "SHORT":
                     gross = -gross
-                costs = (
-                    open_entry["commission"]
-                    + open_entry["slippage"]
-                    + trade["commission"]
-                    + trade["slippage"]
-                )
+                costs = open_entry["commission"] + trade["commission"]
                 returns.append((gross - costs) / notional)
                 open_entry = None
 

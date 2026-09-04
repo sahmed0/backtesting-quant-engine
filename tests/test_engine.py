@@ -66,7 +66,8 @@ def _build(bars, signal_on=1, capital=100_000.0):
         events,
         data_handler,
         portfolio,
-        fixed_commission=0.0,
+        commission_per_share=0.0,
+        min_commission=0.0,
         slippage_pct=SLIPPAGE,
     )
     backtest = Backtest(data_handler, strategy, portfolio, execution, events)
