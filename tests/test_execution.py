@@ -6,6 +6,7 @@ fill at bar t+1's open, and if there is no bar t+1 it must not fill at all.
 """
 
 from collections import deque
+from typing import Literal
 
 import pytest
 from conftest import InMemoryDataHandler, make_bars
@@ -13,6 +14,8 @@ from conftest import InMemoryDataHandler, make_bars
 from event import Event, FillEvent, OrderEvent, OrderFailedEvent
 from execution import SimulatedExecutionHandler
 from portfolio import Portfolio
+
+Side = Literal["BUY", "SELL"]
 
 SLIPPAGE = 0.0005
 COMMISSION = 0.001
@@ -46,13 +49,23 @@ def handler(events, bars, portfolio):
     )
 
 
-def _order(bars, direction="LONG", quantity=10.0, bar_index=0):
+def _side_for(direction: str) -> Side:
+    # Default side by intent; EXIT defaults to SELL (closing a long), and a
+    # short-cover test passes side="BUY" explicitly.
+    mapping: dict[str, Side] = {"LONG": "BUY", "SHORT": "SELL", "EXIT": "SELL"}
+    return mapping[direction]
+
+
+def _order(
+    bars, direction="LONG", quantity=10.0, bar_index=0, side: Side | None = None
+):
     return OrderEvent(
         symbol="TEST",
         timestamp=bars[bar_index].timestamp,
         quantity=quantity,
         direction=direction,
         order_type="MARKET",
+        side=side if side is not None else _side_for(direction),
     )
 
 

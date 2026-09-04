@@ -139,7 +139,8 @@ class Portfolio:
 
         if direction == "EXIT":
             # Flatten whatever position exists, long or short. Exits are sized
-            # from the held quantity, not the sizer.
+            # from the held quantity, not the sizer. The side is what actually
+            # closes the position: SELL a long, BUY to cover a short.
             current_qty = self.current_positions.get(symbol, 0.0)
             if current_qty == 0:
                 self._fail_order(symbol, timestamp, "EXIT", 0.0, "NO_POSITION")
@@ -150,6 +151,7 @@ class Portfolio:
                 quantity=abs(current_qty),
                 direction="EXIT",
                 order_type="MARKET",
+                side="SELL" if current_qty > 0 else "BUY",
             )
             self.events.append(order)
             return
@@ -172,6 +174,7 @@ class Portfolio:
                 quantity=order_quantity,
                 direction=direction,
                 order_type="MARKET",
+                side="BUY" if direction == "LONG" else "SELL",
             )
         )
 
@@ -231,6 +234,7 @@ class Portfolio:
         symbol = event.symbol
         quantity = event.quantity
         direction = event.direction
+        side = event.side
         fill_price = event.fill_price
         commission = event.commission
         slippage = event.slippage
@@ -263,6 +267,7 @@ class Portfolio:
                 "timestamp": event.timestamp.timestamp(),
                 "symbol": symbol,
                 "direction": direction,
+                "side": side,
                 "quantity": quantity,
                 "price": fill_price,
                 "commission": commission,

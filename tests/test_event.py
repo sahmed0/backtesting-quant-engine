@@ -45,6 +45,7 @@ def test_market_event_is_frozen():
             quantity=10,
             direction="LONG",
             order_type="MARKET",
+            side="BUY",
         ),
         FillEvent(
             symbol="AAPL",
@@ -54,6 +55,7 @@ def test_market_event_is_frozen():
             fill_price=100.0,
             commission=1.0,
             slippage=0.05,
+            side="BUY",
         ),
     ],
     ids=["market", "signal", "order", "fill"],

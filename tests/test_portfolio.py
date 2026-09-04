@@ -85,6 +85,7 @@ class TestPortfolio(unittest.TestCase):
         order1 = events.popleft()
         assert isinstance(order1, OrderEvent)
         self.assertEqual(order1.direction, "LONG")
+        self.assertEqual(order1.side, "BUY")  # LONG entry is a BUY
         self.assertEqual(order1.quantity, 100.0)
 
         # A LONG that cash cannot cover is STILL ordered: affordability is no
@@ -99,7 +100,7 @@ class TestPortfolio(unittest.TestCase):
         assert isinstance(order2, OrderEvent)
         self.assertEqual(order2.direction, "LONG")
 
-        # Test valid EXIT
+        # Test valid EXIT of a long: closing a long is a SELL.
         portfolio.current_positions["AAPL"] = 50.0
         signal3 = SignalEvent("AAPL", datetime.now(), "EXIT")
         portfolio.update_signal(signal3)
@@ -107,7 +108,18 @@ class TestPortfolio(unittest.TestCase):
         order3 = events.popleft()
         assert isinstance(order3, OrderEvent)
         self.assertEqual(order3.direction, "EXIT")
+        self.assertEqual(order3.side, "SELL")
         self.assertEqual(order3.quantity, 50.0)
+
+        # An EXIT covering a short is a BUY.
+        portfolio.current_positions["AAPL"] = -30.0
+        signal3b = SignalEvent("AAPL", datetime.now(), "EXIT")
+        portfolio.update_signal(signal3b)
+        self.assertEqual(len(events), 1)
+        order3b = events.popleft()
+        assert isinstance(order3b, OrderEvent)
+        self.assertEqual(order3b.side, "BUY")
+        self.assertEqual(order3b.quantity, 30.0)
 
         # An EXIT with nothing to exit dies loudly rather than silently.
         portfolio.current_positions["AAPL"] = 0.0
@@ -157,7 +169,7 @@ class TestPortfolio(unittest.TestCase):
         """
         events: deque[Event] = deque()
         portfolio = Portfolio(events=events, initial_capital=1000.0)
-        order = OrderEvent("AAPL", datetime.now(), 10.0, "LONG", "MARKET")
+        order = OrderEvent("AAPL", datetime.now(), 10.0, "LONG", "MARKET", "BUY")
 
         # Costs 99.0 * 10 + 1.0 + 0.5 = 991.5, and cash is 1000.0.
         self.assertEqual(portfolio.can_execute(order, 99.0, 1.0, 0.5), (True, None))
@@ -173,7 +185,7 @@ class TestPortfolio(unittest.TestCase):
 
         # A SHORT generates cash rather than consuming it, so it is allowed even
         # with the same cash that rejected the LONG.
-        short = OrderEvent("AAPL", datetime.now(), 10.0, "SHORT", "MARKET")
+        short = OrderEvent("AAPL", datetime.now(), 10.0, "SHORT", "MARKET", "SELL")
         self.assertEqual(portfolio.can_execute(short, 100.0, 1.0, 0.5), (True, None))
 
     def test_update_fill(self):
@@ -184,14 +196,14 @@ class TestPortfolio(unittest.TestCase):
         portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # Test LONG fill
-        fill1 = FillEvent("AAPL", datetime.now(), 10.0, "LONG", 150.0, 5.0, 1.0)
+        fill1 = FillEvent("AAPL", datetime.now(), 10.0, "LONG", 150.0, 5.0, 1.0, "BUY")
         portfolio.update_fill(fill1)
         self.assertEqual(portfolio.current_positions["AAPL"], 10.0)
         # Cost = 10*150 = 1500. Total = 1500+5+1 = 1506. Cash = 100000 - 1506 = 98494
         self.assertEqual(portfolio.current_cash, 98494.0)
 
         # Test EXIT fill
-        fill2 = FillEvent("AAPL", datetime.now(), 5.0, "EXIT", 200.0, 5.0, 1.0)
+        fill2 = FillEvent("AAPL", datetime.now(), 5.0, "EXIT", 200.0, 5.0, 1.0, "SELL")
         portfolio.update_fill(fill2)
         self.assertEqual(portfolio.current_positions["AAPL"], 5.0)
         # Revenue = 5*200 = 1000. Cash increases by 1000 - 5 - 1 = 994. Cash = 98494 + 994 = 99488

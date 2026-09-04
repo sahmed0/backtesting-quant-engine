@@ -165,6 +165,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         check cannot drift apart between them.
         """
         direction = order.direction
+        side = order.side
 
         # Apply the configured slippage to the base price.
         # LONG: pay more (+slippage)
@@ -200,6 +201,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
             fill_price=fill_price,
             commission=commission,
             slippage=slippage_value,
+            side=side,
         )
 
         logger.info(
