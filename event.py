@@ -87,6 +87,7 @@ FailReason = Literal[
     "SIZER_DECLINED",
     "NO_POSITION",
     "INSUFFICIENT_CASH",
+    "INSUFFICIENT_MARGIN",
     "NO_PRICE",
     "END_OF_DATA",
 ]

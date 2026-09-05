@@ -53,6 +53,12 @@ class Portfolio:
         # List of historical positions snapshots
         self.all_positions: list[dict[str, Any]] = []
 
+        # symbol: segregated short-sale proceeds. Proceeds from a short
+        # entry land here, not in current_cash: they count toward total equity
+        # but are not spendable, so a sizer cannot lever off them. Drawn back
+        # down to 0 when the short is covered.
+        self.short_proceeds: dict[str, float] = {}
+
         # symbol: market_value
         self.current_holdings: dict[str, float] = {}
         # List of historical holdings snapshots
@@ -88,13 +94,18 @@ class Portfolio:
         # not a position value and must be excluded from the equity total.
         self.current_holdings["price"] = price
 
+        # Segregated short proceeds are part of equity but not a position market
+        # value, so they are summed separately and excluded from the loop below.
+        total_short_proceeds = sum(self.short_proceeds.values())
+        self.current_holdings["short_proceeds"] = total_short_proceeds
+
         # Calculate total equity
         total_market_value = sum(
             value
             for key, value in self.current_holdings.items()
-            if key not in ("cash", "total", "timestamp", "price")
+            if key not in ("cash", "total", "timestamp", "price", "short_proceeds")
         )
-        total_equity = self.current_cash + total_market_value
+        total_equity = self.current_cash + total_short_proceeds + total_market_value
 
         # Update current holdings with cash, total, and timestamp
         self.current_holdings["cash"] = self.current_cash
@@ -112,15 +123,20 @@ class Portfolio:
 
     def total_equity(self) -> float:
         """
-        Returns current total equity (cash plus the marked-to-market value of
-        all open positions). Computed on demand so position sizers can size off
-        equity even before the first holdings snapshot is recorded.
+        Returns current total equity: cash, plus segregated short proceeds,
+        plus the marked-to-market value of all open positions. Computed on
+        demand so position sizers can size off equity even before the first
+        holdings snapshot is recorded.
+
+        A short position's negative market value nets against its proceeds in
+        the ledger, so opening a short leaves equity unchanged (bar commission).
+        That is what stops a sizer from levering off short proceeds.
         """
         market_value = sum(
             qty * self.current_prices.get(symbol, 0.0)
             for symbol, qty in self.current_positions.items()
         )
-        return self.current_cash + market_value
+        return self.current_cash + sum(self.short_proceeds.values()) + market_value
 
     def update_signal(self, event: SignalEvent) -> None:
         """
@@ -211,20 +227,31 @@ class Portfolio:
 
         Called by the execution handler once the actual fill price is known.
         The whole order is rejected rather than clipped to what cash allows,
-        which keeps the fill either honest or absent.
+        which keeps the backtrader cross-validation exact.
 
-        The BUY arm mirrors exactly what update_fill charges, and the two must
+        The LONG arm mirrors exactly what update_fill charges, and the two must
         be kept in lockstep. Slippage is already inside `fill_price`, so it is
         never added again; the `slippage` argument is accepted only so the
-        signature matches the fill path, and is unused here. A SELL brings cash
-        in rather than consuming it, so it needs no check.
+        signature matches the fill path and is unused here.
+
+        Checks are keyed off `direction`, not `side`, because an EXIT covering a
+        short is a BUY that needs no cash (it draws on the proceeds ledger):
+          - LONG:  cash >= fill_price * qty + commission, else INSUFFICIENT_CASH.
+          - SHORT: cash >= 0.5 * fill_price * qty + commission (Reg-T-style 150%
+                   total collateral), else INSUFFICIENT_MARGIN.
+          - EXIT:  always allowed - flattening never needs new cash.
 
         Returns:
             (True, None) if the order may fill, else (False, reason).
         """
-        if order.side == "BUY":
-            if self.current_cash < fill_price * order.quantity + commission:
+        notional = fill_price * order.quantity
+
+        if order.direction == "LONG":
+            if self.current_cash < notional + commission:
                 return False, "INSUFFICIENT_CASH"
+        elif order.direction == "SHORT":
+            if self.current_cash < 0.5 * notional + commission:
+                return False, "INSUFFICIENT_MARGIN"
 
         return True, None
 
@@ -244,14 +271,36 @@ class Portfolio:
 
         if symbol not in self.current_positions:
             self.current_positions[symbol] = 0.0
+        if symbol not in self.short_proceeds:
+            self.short_proceeds[symbol] = 0.0
 
-        # Cash follows the side the shares actually moved, so an exit is priced
-        # like any other buy or sell. Slippage is already baked into fill_price
-        # and is never charged again here.
-        if side == "BUY":
+        position_before = self.current_positions[symbol]
+
+        # Cash flow follows the position lifecycle. Slippage is already
+        # baked into fill_price, so it is never charged again here.
+        if direction == "SHORT":
+            # Short entry (SELL): proceeds are segregated, not spendable. Only
+            # the commission comes out of cash.
+            self.short_proceeds[symbol] += fill_cost
+            self.current_cash -= commission
+            self.current_positions[symbol] -= quantity
+        elif side == "BUY" and position_before < 0:
+            # EXIT covering a short (BUY): return the segregated proceeds, pay
+            # for the cover and the commission. The whole short is always closed
+            # at once (flatten-before-reverse), so anything else is an engine bug.
+            if quantity != abs(position_before):
+                raise ValueError(
+                    f"partial short cover for {symbol}: filled {quantity} "
+                    f"against position {position_before}"
+                )
+            self.current_cash += self.short_proceeds[symbol] - fill_cost - commission
+            self.short_proceeds[symbol] = 0.0
+            self.current_positions[symbol] += quantity
+        elif side == "BUY":
+            # LONG entry: pay out, position rises.
             self.current_positions[symbol] += quantity
             self.current_cash -= fill_cost + commission
-        else:  # SELL
+        else:  # SELL closing a long (EXIT of a long): take in, position falls.
             self.current_positions[symbol] -= quantity
             self.current_cash += fill_cost - commission
 
