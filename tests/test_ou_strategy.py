@@ -52,15 +52,19 @@ def test_trending_rejection(base_strategy):
     """
     If a stock is purely trending up, the OU process should realize
     it is NOT mean-reverting (theta <= 0) and refuse to trade.
+
+    The model now fits log-prices, so the non-mean-reverting series is a
+    *geometric* trend (constant log-returns => a straight line in log space).
+    A linear price ramp is concave in log space and would read as mean-reverting.
     """
-    # Create a strictly trending price series: 10, 20, 30, 40...
+    # Geometric trend: 100, 110, 121, ... -> log-prices are linear -> theta ~ 0.
     for i in range(10):
-        feed(base_strategy, float((i + 1) * 10))
+        feed(base_strategy, 100.0 * 1.1**i)
 
     # Manually trigger the calibration
     mu, sigma, is_mean_reverting = base_strategy._calibrate_ou_parameters()
 
-    # A straight upward line is not mean-reverting
+    # A straight line in log space is not mean-reverting
     assert is_mean_reverting is False
 
 
@@ -87,7 +91,7 @@ def test_mean_reversion_signals():
     assert signal is not None
     assert isinstance(signal, SignalEvent)
     assert signal.direction == "SHORT"
-    assert strategy.invested == "SHORT"
+    assert strategy.intent["AAPL"] == "SHORT"
 
     # 4. Crash the price back down to the mean (100.0)
     exit_signal = feed(strategy, 100.0)
@@ -95,7 +99,7 @@ def test_mean_reversion_signals():
     # 5. Verify it closed the trade
     assert exit_signal is not None
     assert exit_signal.direction == "EXIT"
-    assert strategy.invested is False
+    assert strategy.intent["AAPL"] is None
 
 
 def test_long_only_ignores_spike():
@@ -107,7 +111,7 @@ def test_long_only_ignores_spike():
         feed(strategy, p)
 
     assert feed(strategy, 110.0) is None
-    assert strategy.invested is False
+    assert strategy.intent.get("AAPL") is None
 
 
 def test_signals_reach_a_shared_queue():

@@ -115,11 +115,13 @@ class Backtest:
                     self.execution_handler.execute_order(event)
                 case FillEvent():
                     self.portfolio.update_fill(event)
+                    self.strategy.on_fill(event)
                 case OrderFailedEvent():
                     logger.info(
                         f"ORDER FAILED {event.timestamp} {event.direction} "
                         f"{event.quantity} {event.symbol} (reason: {event.reason})"
                     )
+                    self.strategy.on_order_failed(event)
                 case MarketEvent():
                     # Market data reaches the engine as update_bars()'s return
                     # value, never through the queue. One arriving here means a
