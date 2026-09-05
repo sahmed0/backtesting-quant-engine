@@ -23,7 +23,7 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests that the portfolio initialises correctly.
         """
-        events = deque()
+        events: deque[Event] = deque()
         portfolio = Portfolio(events=events, initial_capital=50000.0)
         self.assertEqual(portfolio.initial_capital, 50000.0)
         self.assertEqual(portfolio.current_cash, 50000.0)
@@ -37,7 +37,7 @@ class TestPortfolio(unittest.TestCase):
         """
         Tests that updating the timeindex correctly calculates holdings and equity.
         """
-        events = deque()
+        events: deque[Event] = deque()
         portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # Simulate an existing position
@@ -184,17 +184,48 @@ class TestPortfolio(unittest.TestCase):
         # Exactly affordable: 99.9 * 10 + 1.0 = 1000.0. Boundary is >=.
         self.assertEqual(portfolio.can_execute(order, 99.9, 1.0, 0.5), (True, None))
 
-        # A SHORT is a SELL, which brings cash in rather than consuming it, so
-        # it is allowed even with the cash that rejected the LONG.
+    def test_can_execute_short_margin(self):
+        """
+        A short is checked at fill time against 50% of notional + commission
+        (Reg-T-style 150% collateral). An EXIT is always allowed - it never
+        needs new cash.
+        """
+        events: deque[Event] = deque()
+        portfolio = Portfolio(events=events, initial_capital=1000.0)
         short = OrderEvent("AAPL", datetime.now(), 10.0, "SHORT", "MARKET", "SELL")
+
+        # Notional 100*10 = 1000; required margin = 0.5*1000 + 1 = 501 <= 1000.
         self.assertEqual(portfolio.can_execute(short, 100.0, 1.0, 0.5), (True, None))
+
+        # Exact boundary: cash 501 == 0.5*1000 + 1. Boundary is >=.
+        portfolio.current_cash = 501.0
+        self.assertEqual(portfolio.can_execute(short, 100.0, 1.0, 0.5), (True, None))
+
+        # Cash below the margin requirement is rejected.
+        portfolio.current_cash = 500.0
+        self.assertEqual(
+            portfolio.can_execute(short, 100.0, 1.0, 0.5),
+            (False, "INSUFFICIENT_MARGIN"),
+        )
+
+        # An EXIT is unconditionally allowed, even with no cash: covering a short
+        # draws on the proceeds ledger and closing a long only brings cash in.
+        portfolio.current_cash = 0.0
+        exit_long = OrderEvent("AAPL", datetime.now(), 10.0, "EXIT", "MARKET", "SELL")
+        exit_short = OrderEvent("AAPL", datetime.now(), 10.0, "EXIT", "MARKET", "BUY")
+        self.assertEqual(
+            portfolio.can_execute(exit_long, 100.0, 1.0, 0.5), (True, None)
+        )
+        self.assertEqual(
+            portfolio.can_execute(exit_short, 100.0, 1.0, 0.5), (True, None)
+        )
 
     def test_update_fill(self):
         """
         Tests updating positions and cash based on a fill. Cash moves by side,
         and slippage is never charged again - it is already in fill_price.
         """
-        events = deque()
+        events: deque[Event] = deque()
         portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # BUY fill (LONG entry): pay fill_cost + commission only.
@@ -230,11 +261,101 @@ class TestPortfolio(unittest.TestCase):
             portfolio.current_cash, 100000.0 - (105.0525 * 10.0 + 1.0), places=9
         )
 
+    def test_short_entry_segregates_proceeds(self):
+        """
+        A short entry's proceeds go to the segregated ledger, not spendable
+        cash. Only the commission comes out of cash, and total equity is
+        unchanged by the entry apart from that commission.
+        """
+        events: deque[Event] = deque()
+        portfolio = Portfolio(events=events, initial_capital=10000.0)
+        portfolio.current_prices["AAPL"] = 100.0  # mark at the entry price
+
+        # SHORT entry (SELL) of 10 @ 100: proceeds 1000 to the ledger, cash
+        # loses only the commission, position goes to -10.
+        fill = FillEvent("AAPL", datetime.now(), 10.0, "SHORT", 100.0, 1.0, 0.5, "SELL")
+        portfolio.update_fill(fill)
+
+        self.assertEqual(portfolio.current_positions["AAPL"], -10.0)
+        self.assertEqual(portfolio.short_proceeds["AAPL"], 1000.0)
+        self.assertEqual(portfolio.current_cash, 9999.0)  # 10000 - commission
+        # Equity = cash 9999 + proceeds 1000 + (-10 * 100) = 9999. The proceeds
+        # net exactly against the negative market value: no free money.
+        self.assertEqual(portfolio.total_equity(), 9999.0)
+
+    def test_short_cover_draws_down_ledger(self):
+        """
+        Covering a short (BUY) returns the segregated proceeds, pays for the
+        cover and the commission, and zeroes both the position and the ledger.
+        """
+        events: deque[Event] = deque()
+        portfolio = Portfolio(events=events, initial_capital=10000.0)
+
+        # Open the short first: cash 9999, proceeds 1000, pos -10.
+        portfolio.update_fill(
+            FillEvent("AAPL", datetime.now(), 10.0, "SHORT", 100.0, 1.0, 0.5, "SELL")
+        )
+        # Cover 10 @ 90 (price fell, so the short profits).
+        portfolio.update_fill(
+            FillEvent("AAPL", datetime.now(), 10.0, "EXIT", 90.0, 1.0, 0.5, "BUY")
+        )
+
+        self.assertEqual(portfolio.current_positions["AAPL"], 0.0)
+        self.assertEqual(portfolio.short_proceeds["AAPL"], 0.0)
+        # cash = 9999 + proceeds 1000 - cover 900 - commission 1 = 10098. The
+        # short made 100 gross (sold @100, covered @90) minus two commissions.
+        self.assertEqual(portfolio.current_cash, 10098.0)
+
+    def test_partial_short_cover_is_an_engine_bug(self):
+        """
+        The strategy always flattens the whole short before reversing, so a
+        cover for anything but the full position is an engine bug, not a user
+        error - update_fill must fail loudly.
+        """
+        events: deque[Event] = deque()
+        portfolio = Portfolio(events=events, initial_capital=10000.0)
+        portfolio.update_fill(
+            FillEvent("AAPL", datetime.now(), 10.0, "SHORT", 100.0, 1.0, 0.5, "SELL")
+        )
+        with self.assertRaises(ValueError):
+            portfolio.update_fill(
+                FillEvent("AAPL", datetime.now(), 4.0, "EXIT", 90.0, 1.0, 0.5, "BUY")
+            )
+
+    def test_short_proceeds_do_not_lever_the_sizer(self):
+        """
+        A PercentEquitySizer sizes off total_equity(). Opening a
+        short must not inflate equity, so the quantity sized for a later LONG is
+        identical to the no-short baseline.
+        """
+        from position_sizing import PercentEquitySizer
+
+        sizer = PercentEquitySizer(0.1)
+
+        # Baseline: no short open, equity == initial capital, price 50.
+        baseline = Portfolio(events=deque(), initial_capital=10000.0, sizer=sizer)
+        baseline.current_prices["AAPL"] = 50.0
+        baseline_qty = sizer.size("AAPL", "LONG", 50.0, baseline)
+
+        # With a short open first: proceeds are segregated, so equity is
+        # unchanged (bar the commission), and the LONG sizes the same.
+        with_short = Portfolio(events=deque(), initial_capital=10000.0, sizer=sizer)
+        with_short.current_prices["MSFT"] = 100.0
+        with_short.update_fill(
+            FillEvent("MSFT", datetime.now(), 10.0, "SHORT", 100.0, 0.0, 0.5, "SELL")
+        )
+        with_short.current_prices["AAPL"] = 50.0
+        short_qty = sizer.size("AAPL", "LONG", 50.0, with_short)
+
+        # Commission was 0, so equity is exactly equal and the quantities match.
+        self.assertEqual(with_short.total_equity(), 10000.0)
+        self.assertEqual(short_qty, baseline_qty)
+
     def test_generate_equity_curve(self):
         """
         Tests generating the equity curve DataFrame.
         """
-        events = deque()
+        events: deque[Event] = deque()
         portfolio = Portfolio(events=events, initial_capital=100000.0)
 
         # Empty curve
