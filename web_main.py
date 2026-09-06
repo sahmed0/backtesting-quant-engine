@@ -8,6 +8,7 @@ import traceback
 from collections import deque
 from datetime import UTC, datetime
 
+import numpy as np
 from pyodide.ffi import create_proxy
 from pyscript import document, window
 
@@ -29,10 +30,17 @@ from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
 from strategy import SimpleMovingAverageStrategy
 
 
-def build_sizer(choice):
-    """Maps the UI position-sizing choice to a PositionSizer instance."""
+def build_sizer(choice, periods_per_year):
+    """Maps the UI position-sizing choice to a PositionSizer instance.
+
+    ``periods_per_year`` is inferred from the loaded data and used by the
+    volatility-target sizer to annualise its measured volatility; the other
+    sizers ignore it.
+    """
     if choice == "vol":
-        return VolatilityTargetSizer(target_volatility=0.15, lookback=20)
+        return VolatilityTargetSizer(
+            target_volatility=0.15, lookback=20, periods=periods_per_year
+        )
     if choice == "atr":
         return ATRStopSizer(risk_fraction=0.02, atr_period=14, atr_multiple=2.0)
     if choice == "kelly":
@@ -143,6 +151,12 @@ def _read_timestamps(csv_path):
     return timestamps
 
 
+def _infer_ppy(csv_path):
+    """Infers periods-per-year from a symbol CSV's bar timestamps."""
+    seconds = np.array([t.timestamp() for t in _read_timestamps(csv_path)])
+    return performance.infer_periods_per_year(seconds)
+
+
 async def _grid_sharpe(
     symbol,
     start,
@@ -152,6 +166,7 @@ async def _grid_sharpe(
     commission_per_share,
     min_commission,
     slippage_pct,
+    periods_per_year,
 ):
     """
     Runs the SMA parameter grid over [start, end] and returns a 2D list of
@@ -175,7 +190,9 @@ async def _grid_sharpe(
                 events, short_window=short_w, long_window=long_w
             )
             portfolio = Portfolio(
-                events, initial_capital=initial_capital, sizer=build_sizer(sizer_choice)
+                events,
+                initial_capital=initial_capital,
+                sizer=build_sizer(sizer_choice, periods_per_year),
             )
             execution_handler = SimulatedExecutionHandler(
                 events,
@@ -256,6 +273,12 @@ async def analyse_overfitting(event):
         is_start, is_end = timestamps[0], timestamps[split_idx - 1]
         oos_start, oos_end = timestamps[split_idx], timestamps[-1]
 
+        # Annualisation factor for the vol-target sizer, from the full history
+        # so both windows are sized on the same footing.
+        periods_per_year = performance.infer_periods_per_year(
+            np.array([t.timestamp() for t in timestamps])
+        )
+
         valid = sum(
             1
             for short_w in OF_SHORT_WINDOWS
@@ -274,6 +297,7 @@ async def analyse_overfitting(event):
             commission_per_share,
             min_commission,
             slippage_pct,
+            periods_per_year,
         )
         status_el.innerText = f"Analysing... {done_is}/{total}"
         oos_grid, _ = await _grid_sharpe(
@@ -285,6 +309,7 @@ async def analyse_overfitting(event):
             commission_per_share,
             min_commission,
             slippage_pct,
+            periods_per_year,
         )
 
         is_cells = _rank_cells(is_grid)
@@ -385,6 +410,7 @@ async def run_backtest(event):
         elif ticker_select.value:
             # Handle pre-loaded ticker
             symbol = ticker_select.value
+            csv_path = f"/data/{symbol}.csv"
             status_el.innerText = f"Running backtest for pre-loaded {symbol}..."
         else:
             status_el.innerText = "No data source selected."
@@ -439,8 +465,14 @@ async def run_backtest(event):
         if commission_per_share < 0 or min_commission < 0 or slippage_pct < 0:
             raise ValueError("Commission and slippage cannot be negative.")
 
+        # Annualisation factor inferred from the loaded data: used by the
+        # vol-target sizer and surfaced under the Sharpe tile.
+        periods_per_year = _infer_ppy(csv_path)
+
         portfolio = Portfolio(
-            events, initial_capital=initial_capital, sizer=build_sizer(sizer_choice)
+            events,
+            initial_capital=initial_capital,
+            sizer=build_sizer(sizer_choice, periods_per_year),
         )
         execution_handler = SimulatedExecutionHandler(
             events,
@@ -476,6 +508,9 @@ async def run_backtest(event):
             document.getElementById(
                 "val-sharpe"
             ).innerText = f"{stats['sharpe_ratio']:.2f}"
+            document.getElementById(
+                "cap-sharpe"
+            ).innerText = f"annualised @ {round(stats['periods_per_year'])} periods/yr"
             document.getElementById(
                 "val-drawdown"
             ).innerText = f"{stats['max_drawdown'] * 100:.2f}%"
