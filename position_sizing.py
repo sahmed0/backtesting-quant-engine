@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
+from performance import completed_round_trips
+
 if TYPE_CHECKING:
     # Imported for type hints only; importing at runtime would be circular.
     from portfolio import Portfolio
@@ -126,7 +128,7 @@ class VolatilityTargetSizer(PositionSizer):
         self,
         target_volatility: float = 0.15,
         lookback: int = 20,
-        periods: int = 252,
+        periods: float = 252,
         max_leverage: float = 1.0,
     ):
         """
@@ -134,7 +136,8 @@ class VolatilityTargetSizer(PositionSizer):
             target_volatility: Desired annualised volatility of the position,
                 e.g. 0.15 for 15%.
             lookback: Number of returns used to estimate volatility.
-            periods: Periods per year used to annualise (252 for daily bars).
+            periods: Periods per year used to annualise (252 for daily bars,
+                or inferred from the data's bar density).
             max_leverage: Cap on equity exposure, so a very low measured
                 volatility cannot demand an unbounded position.
         """
@@ -344,36 +347,17 @@ class FractionalKellySizer(PositionSizer):
     @staticmethod
     def _completed_returns(trades: list, symbol: str) -> list[float]:
         """
-        Pairs each entry with the EXIT that closes it and returns the realised
-        return of each round trip as a fraction of the entry notional, net of
-        commission on both legs. Slippage is not subtracted: it is already
-        embedded in the fill prices, so charging it here would count it twice.
+        Returns the realised net return of each completed round trip in
+        ``symbol``, as a fraction of the entry notional. This delegates to the
+        shared :func:`performance.completed_round_trips` pairing so the sizer and
+        the reported trade stats agree by construction. Slippage is not
+        subtracted: it is already embedded in the fill prices.
         """
-        returns: list[float] = []
-        open_entry: dict | None = None
-
-        for trade in trades:
-            if trade["symbol"] != symbol:
-                continue
-            direction = trade["direction"]
-            if direction in ("LONG", "SHORT"):
-                if open_entry is None:
-                    open_entry = trade
-            elif direction == "EXIT" and open_entry is not None:
-                entry_price = open_entry["price"]
-                quantity = open_entry["quantity"]
-                notional = entry_price * quantity
-                if notional <= 0:
-                    open_entry = None
-                    continue
-                gross = (trade["price"] - entry_price) * quantity
-                if open_entry["direction"] == "SHORT":
-                    gross = -gross
-                costs = open_entry["commission"] + trade["commission"]
-                returns.append((gross - costs) / notional)
-                open_entry = None
-
-        return returns
+        return [
+            trip["net_return"]
+            for trip in completed_round_trips(trades)
+            if trip["symbol"] == symbol
+        ]
 
     def _kelly_fraction(self, returns: list[float]) -> float:
         wins = [r for r in returns if r > 0]
