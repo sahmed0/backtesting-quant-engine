@@ -363,6 +363,13 @@
       color: var(--text-main);
     }
 
+    .metric-caption {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      min-height: 0.9rem;
+    }
+
     /* Dynamic Colors applied via JS */
     .text-success {
       color: var(--success) !important;
@@ -867,13 +874,14 @@
           <div class="metric-box">
             <div class="metric-header"><span>Sharpe Ratio</span> <i class="fa-solid fa-scale-balanced"></i></div>
             <div class="metric-value" id="val-sharpe">-</div>
+            <div class="metric-caption" id="cap-sharpe"></div>
           </div>
           <div class="metric-box">
             <div class="metric-header"><span>Max Drawdown</span> <i class="fa-solid fa-arrow-trend-down"></i></div>
             <div class="metric-value" id="val-drawdown">-</div>
           </div>
           <div class="metric-box">
-            <div class="metric-header"><span>Win Rate</span> <i class="fa-solid fa-bullseye"></i></div>
+            <div class="metric-header"><span>Win Rate (trades)</span> <i class="fa-solid fa-bullseye"></i></div>
             <div class="metric-value" id="val-winrate">-</div>
           </div>
           <div class="metric-box">

@@ -42,6 +42,8 @@ def build_sizer():
     if SIZING == "percent":
         return PercentEquitySizer(fraction=0.1)
     if SIZING == "vol":
+        # 252 periods/year is the default and is correct for this daily equity
+        # data; the web UI infers it from the bar density instead.
         return VolatilityTargetSizer(target_volatility=0.15, lookback=20)
     if SIZING == "atr":
         return ATRStopSizer(risk_fraction=0.02, atr_period=14, atr_multiple=2.0)

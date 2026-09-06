@@ -197,7 +197,12 @@ def main():
     equity = INITIAL_CAPITAL * np.cumprod(1.0 + all_returns)
     equity = np.insert(equity, 0, INITIAL_CAPITAL)
 
-    wf_sharpe = performance.calculate_sharpe_ratio(all_returns)
+    # Annualise the stitched curve's Sharpe from the full history's bar
+    # density rather than assuming 252.
+    ppy = performance.infer_periods_per_year(
+        np.array([t.timestamp() for t in timestamps])
+    )
+    wf_sharpe = performance.calculate_sharpe_ratio(all_returns, periods=ppy)
     wf_total_return = equity[-1] / INITIAL_CAPITAL - 1.0
     wf_maxdd = performance.calculate_drawdown(equity)
     avg_wfe = float(np.mean(wfe_per_fold)) if wfe_per_fold else float("nan")
