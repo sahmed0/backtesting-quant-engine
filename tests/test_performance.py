@@ -300,7 +300,7 @@ def test_create_summary_stats_end_to_end():
     ]
     # _StubPortfolio is a deliberate duck type: create_summary_stats reads only
     # three members of it.
-    stats = create_summary_stats(_StubPortfolio(df, trades, 100_000.0))
+    stats = create_summary_stats(_StubPortfolio(df, trades, 100_000.0))  # type: ignore[arg-type]
 
     assert "error" not in stats
     assert abs(stats["total_return"] - 0.02) < 1e-12
@@ -320,16 +320,16 @@ def test_create_summary_stats_no_trades_gives_zero_win_rate():
         totals=[100_000.0, 100_500.0, 101_000.0],
         prices=[100.0, 100.5, 101.0],
     )
-    stats = create_summary_stats(_StubPortfolio(df, [], 100_000.0))
+    stats = create_summary_stats(_StubPortfolio(df, [], 100_000.0))  # type: ignore[arg-type]
     assert stats["win_rate"] == 0.0
     assert stats["num_trades"] == 0
 
 
 def test_create_summary_stats_empty_and_insufficient():
     empty = _StubPortfolio(pd.DataFrame(), [], 100_000.0)
-    assert "error" in create_summary_stats(empty)
+    assert "error" in create_summary_stats(empty)  # type: ignore[arg-type]
 
     one_row = _StubPortfolio(
         _daily_curve(totals=[100_000.0], prices=[100.0]), [], 100_000.0
     )
-    assert "error" in create_summary_stats(one_row)
+    assert "error" in create_summary_stats(one_row)  # type: ignore[arg-type]

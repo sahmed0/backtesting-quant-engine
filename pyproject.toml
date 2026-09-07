@@ -63,3 +63,9 @@ disallow_untyped_defs = true
 # Third-party packages that ship no type information.
 module = ["pandas.*", "yfinance.*", "tqdm.*"]
 ignore_missing_imports = true
+
+[tool.coverage.run]
+# Bare --cov in CI measures the whole project; keep tests and the virtualenv
+# out of the report. No coverage threshold is set, the golden and performance
+# tests are the point, not a percentage.
+omit = ["tests/*", ".venv/*"]
