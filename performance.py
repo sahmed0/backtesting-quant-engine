@@ -4,6 +4,7 @@ Performance metrics and summary statistics for trading portfolios.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -300,3 +301,114 @@ def create_summary_stats(portfolio: Portfolio) -> dict:
         "avg_trade_duration": avg_trade_duration,
         "periods_per_year": periods_per_year,
     }
+
+
+# --- Deflated Sharpe Ratio --------------------------------------------------
+#
+# All Sharpe inputs to the Deflated Sharpe maths are PER-PERIOD (non-annualised)
+# and ``kurt`` is raw kurtosis (Normal = 3). Everything here is stdlib + numpy so
+# it runs inside Pyodide without pulling scipy into the browser payload.
+
+# Euler-Mascheroni constant, used to weight the expected maximum of N iid
+# Sharpe estimates (Bailey & Lopez de Prado 2014).
+EULER_MASCHERONI = 0.5772156649015329
+
+
+def normal_cdf(x: float) -> float:
+    """Standard-normal CDF via the error function."""
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def normal_ppf(p: float) -> float:
+    """
+    Standard-normal inverse CDF (quantile) by bisection on ``normal_cdf`` over
+    [-10, 10], 80 iterations - deterministic and free of magic constants.
+    Raises ``ValueError`` for ``p`` outside the open interval (0, 1).
+    """
+    if not 0.0 < p < 1.0:
+        raise ValueError("normal_ppf requires 0 < p < 1")
+
+    lo, hi = -10.0, 10.0
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        if normal_cdf(mid) < p:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def expected_max_sharpe(sr_variance: float, n_trials: int) -> float:
+    """
+    Expected maximum of ``n_trials`` iid Sharpe estimates whose variance is
+    ``sr_variance`` (Bailey & Lopez de Prado 2014, Appendix D)::
+
+        SR0 = sqrt(V) * [(1 - gamma) * Phi^-1(1 - 1/N)
+                         + gamma * Phi^-1(1 - 1/(N*e))]
+
+    with gamma the Euler-Mascheroni constant. Returns 0.0 when there are fewer
+    than two trials or the variance is non-positive.
+    """
+    if n_trials < 2 or sr_variance <= 0.0:
+        return 0.0
+
+    n = float(n_trials)
+    gamma = EULER_MASCHERONI
+    term = (1.0 - gamma) * normal_ppf(1.0 - 1.0 / n) + gamma * normal_ppf(
+        1.0 - 1.0 / (n * math.e)
+    )
+    return math.sqrt(sr_variance) * term
+
+
+def deflated_sharpe_ratio(
+    sr_observed: float,
+    sr_variance: float,
+    n_trials: int,
+    n_obs: int,
+    skew: float,
+    kurt: float,
+) -> float:
+    """
+    Deflated Sharpe Ratio (Bailey & Lopez de Prado 2014): the probability the
+    observed per-period Sharpe is genuinely positive after correcting for having
+    selected the best of ``n_trials`` configurations.
+
+    All Sharpe inputs are per-period (non-annualised); ``kurt`` is raw kurtosis
+    (Normal = 3). With ``sr0 = expected_max_sharpe(sr_variance, n_trials)``::
+
+        DSR = Phi( (sr_obs - sr0) * sqrt(n_obs - 1)
+                   / sqrt(1 - skew*sr_obs + ((kurt - 1)/4) * sr_obs^2) )
+
+    Returns 0.0 when the variance radicand is non-positive or ``n_obs < 2``.
+    """
+    if n_obs < 2:
+        return 0.0
+
+    sr0 = expected_max_sharpe(sr_variance, n_trials)
+    radicand = 1.0 - skew * sr_observed + ((kurt - 1.0) / 4.0) * sr_observed**2
+    if radicand <= 0.0:
+        return 0.0
+
+    z = (sr_observed - sr0) * math.sqrt(n_obs - 1) / math.sqrt(radicand)
+    return normal_cdf(z)
+
+
+def returns_moments(returns: np.ndarray) -> tuple[float, float]:
+    """
+    Population skewness ``mean((r-mu)^3)/sigma^3`` and raw kurtosis
+    ``mean((r-mu)^4)/sigma^4`` (sigma the population std) of a returns stream,
+    for feeding the Deflated Sharpe. Returns ``(0.0, 3.0)`` - the Normal
+    reference - when the sample has fewer than two points or zero variance.
+    """
+    r = np.asarray(returns, dtype=float)
+    if len(r) < 2:
+        return 0.0, 3.0
+
+    sigma = float(np.std(r))
+    if sigma == 0.0:
+        return 0.0, 3.0
+
+    centered = r - np.mean(r)
+    skew = float(np.mean(centered**3) / sigma**3)
+    kurt = float(np.mean(centered**4) / sigma**4)
+    return skew, kurt
