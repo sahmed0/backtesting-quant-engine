@@ -303,7 +303,7 @@ def create_summary_stats(portfolio: Portfolio) -> dict:
     }
 
 
-# --- Deflated Sharpe Ratio --------------------------------------------------
+# --- Deflated Sharpe & bootstrap CIs -----------------------------------------
 #
 # All Sharpe inputs to the Deflated Sharpe maths are PER-PERIOD (non-annualised)
 # and ``kurt`` is raw kurtosis (Normal = 3). Everything here is stdlib + numpy so
@@ -412,3 +412,77 @@ def returns_moments(returns: np.ndarray) -> tuple[float, float]:
     skew = float(np.mean(centered**3) / sigma**3)
     kurt = float(np.mean(centered**4) / sigma**4)
     return skew, kurt
+
+
+def bootstrap_sharpe_samples(
+    returns: np.ndarray,
+    periods_per_year: float,
+    n_resamples: int,
+    rng: np.random.Generator,
+    mean_block: int | None = None,
+) -> list[float]:
+    """
+    Annualised Sharpe ratios of ``n_resamples`` stationary-bootstrap resamples of
+    ``returns`` (Politis-Romano). Serial dependence is preserved by drawing
+    variable-length blocks: the expected block length is ``L = mean_block or
+    max(2, round(n ** (1/3)))``; each step continues the current block with
+    probability ``1 - 1/L`` (wrapping ``(i+1) mod n``), otherwise jumps to a
+    fresh uniform start. Each resample has the same length as ``returns``.
+
+    The passed ``rng`` is advanced in place, so a caller can invoke this in
+    batches (yielding to the event loop between calls) and get one continuous,
+    reproducible stream of resamples.
+    """
+    r = np.asarray(returns, dtype=float)
+    n = len(r)
+    samples: list[float] = []
+    if n < 2:
+        return samples
+
+    length = mean_block if mean_block is not None else max(2, round(n ** (1.0 / 3.0)))
+    p_jump = 1.0 / length
+    sqrt_ppy = math.sqrt(periods_per_year)
+
+    for _ in range(n_resamples):
+        idx = np.empty(n, dtype=np.int64)
+        i = int(rng.integers(0, n))
+        for k in range(n):
+            idx[k] = i
+            if rng.random() < p_jump:
+                i = int(rng.integers(0, n))
+            else:
+                i = (i + 1) % n
+        resample = r[idx]
+        stdev = float(np.std(resample, ddof=1))
+        if stdev == 0.0:
+            samples.append(0.0)
+        else:
+            samples.append(float(np.mean(resample) / stdev * sqrt_ppy))
+    return samples
+
+
+def sharpe_confidence_interval(
+    returns: np.ndarray,
+    periods_per_year: float,
+    n_resamples: int = 1000,
+    seed: int = 42,
+    ci: float = 0.95,
+) -> tuple[float, float]:
+    """
+    Bootstrap confidence interval (default 95%) for the annualised Sharpe ratio,
+    via the stationary bootstrap. Deterministic for a given ``seed``. Returns
+    ``(0.0, 0.0)`` when there are fewer than 10 returns.
+    """
+    r = np.asarray(returns, dtype=float)
+    if len(r) < 10:
+        return 0.0, 0.0
+
+    rng = np.random.default_rng(seed)
+    samples = bootstrap_sharpe_samples(r, periods_per_year, n_resamples, rng)
+    if not samples:
+        return 0.0, 0.0
+
+    tail = (1.0 - ci) / 2.0 * 100.0
+    lo = float(np.percentile(samples, tail))
+    hi = float(np.percentile(samples, 100.0 - tail))
+    return lo, hi
