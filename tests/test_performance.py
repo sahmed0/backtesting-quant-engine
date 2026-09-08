@@ -8,6 +8,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from performance import (
     calculate_alpha,
@@ -17,7 +18,12 @@ from performance import (
     calculate_trade_stats,
     completed_round_trips,
     create_summary_stats,
+    deflated_sharpe_ratio,
+    expected_max_sharpe,
     infer_periods_per_year,
+    normal_cdf,
+    normal_ppf,
+    returns_moments,
 )
 from position_sizing import FractionalKellySizer
 
@@ -298,8 +304,8 @@ def test_create_summary_stats_end_to_end():
         make_trade("AAPL", "LONG", 10, 120.0),
         make_trade("AAPL", "EXIT", 10, 115.0),  # loss
     ]
-    # _StubPortfolio is a deliberate duck type: create_summary_stats reads only
-    # three members of it.
+    # _StubPortfolio is a deliberate duck type (create_summary_stats reads only
+    # three members), so the nominal Portfolio arg type is intentionally waived.
     stats = create_summary_stats(_StubPortfolio(df, trades, 100_000.0))  # type: ignore[arg-type]
 
     assert "error" not in stats
@@ -333,3 +339,96 @@ def test_create_summary_stats_empty_and_insufficient():
         _daily_curve(totals=[100_000.0], prices=[100.0]), [], 100_000.0
     )
     assert "error" in create_summary_stats(one_row)  # type: ignore[arg-type]
+
+
+# --- Deflated Sharpe Ratio ---------------------------------------------------
+
+
+def test_normal_ppf_inverts_normal_cdf():
+    # normal_ppf is the inverse of normal_cdf over a spread of quantiles.
+    for x in [-2.5, -1.0, -0.3, 0.0, 0.3, 1.0, 2.5]:
+        assert normal_ppf(normal_cdf(x)) == pytest.approx(x, abs=1e-4)
+    # The canonical two-sided 95% critical value.
+    assert normal_ppf(0.975) == pytest.approx(1.959964, abs=1e-4)
+
+
+def test_normal_ppf_rejects_out_of_range():
+    for bad in (0.0, 1.0, -0.1, 1.5):
+        with pytest.raises(ValueError):
+            normal_ppf(bad)
+
+
+def test_deflated_sharpe_is_half_at_the_expected_maximum():
+    # When the observed Sharpe equals the expected maximum of the trials, the
+    # numerator is zero, so the DSR is exactly Phi(0) = 0.5. Skew 0, kurt 3
+    # (Normal) so the denominator radicand is well defined.
+    sr_variance = 0.04  # per-period Sharpe std 0.2 across trials
+    n_trials = 10
+    sr0 = expected_max_sharpe(sr_variance, n_trials)
+    dsr = deflated_sharpe_ratio(
+        sr_observed=sr0,
+        sr_variance=sr_variance,
+        n_trials=n_trials,
+        n_obs=500,
+        skew=0.0,
+        kurt=3.0,
+    )
+    assert dsr == pytest.approx(0.5, abs=1e-9)
+
+
+def test_deflated_sharpe_strong_edge_is_confident():
+    # An observed Sharpe far above the selection-corrected threshold, on a long
+    # sample, should be nearly certain to be genuine.
+    sr0 = expected_max_sharpe(0.01, 5)
+    dsr = deflated_sharpe_ratio(
+        sr_observed=sr0 + 0.5,
+        sr_variance=0.01,
+        n_trials=5,
+        n_obs=1000,
+        skew=0.0,
+        kurt=3.0,
+    )
+    assert dsr > 0.99
+
+
+def test_deflated_sharpe_pure_noise_is_not_significant():
+    # Twenty independent zero-edge return streams; pick the luckiest as the
+    # "observed" Sharpe and deflate by the spread across the trials. With no real
+    # edge the DSR must not clear a confident threshold.
+    rng = np.random.default_rng(7)
+    n_trials = 20
+    per_period_sharpes = []
+    n_obs = 500
+    for _ in range(n_trials):
+        r = rng.normal(0.0, 0.01, size=n_obs)
+        per_period_sharpes.append(float(np.mean(r) / np.std(r, ddof=1)))
+    sr_observed = max(per_period_sharpes)
+    sr_variance = float(np.var(per_period_sharpes, ddof=1))
+    skew, kurt = returns_moments(rng.normal(0.0, 0.01, size=n_obs))
+    dsr = deflated_sharpe_ratio(sr_observed, sr_variance, n_trials, n_obs, skew, kurt)
+    assert dsr < 0.9
+
+
+def test_expected_max_sharpe_guards():
+    assert expected_max_sharpe(0.04, 1) == 0.0
+    assert expected_max_sharpe(0.0, 10) == 0.0
+    assert expected_max_sharpe(-1.0, 10) == 0.0
+
+
+def test_deflated_sharpe_guards():
+    assert deflated_sharpe_ratio(0.1, 0.01, 5, 1, 0.0, 3.0) == 0.0  # n_obs < 2
+    # A radicand driven non-positive by extreme skew returns 0.0.
+    assert deflated_sharpe_ratio(2.0, 0.01, 5, 100, 10.0, 3.0) == 0.0
+
+
+def test_returns_moments_normal_reference():
+    rng = np.random.default_rng(1)
+    r = rng.normal(0.0, 1.0, size=200_000)
+    skew, kurt = returns_moments(r)
+    assert skew == pytest.approx(0.0, abs=0.05)
+    assert kurt == pytest.approx(3.0, abs=0.1)
+
+
+def test_returns_moments_degenerate_cases():
+    assert returns_moments(np.array([0.01])) == (0.0, 3.0)  # n < 2
+    assert returns_moments(np.array([0.01, 0.01, 0.01])) == (0.0, 3.0)  # sigma 0
