@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from performance import (
+    bootstrap_sharpe_samples,
     calculate_alpha,
     calculate_cagr,
     calculate_drawdown,
@@ -24,6 +25,7 @@ from performance import (
     normal_cdf,
     normal_ppf,
     returns_moments,
+    sharpe_confidence_interval,
 )
 from position_sizing import FractionalKellySizer
 
@@ -341,7 +343,7 @@ def test_create_summary_stats_empty_and_insufficient():
     assert "error" in create_summary_stats(one_row)  # type: ignore[arg-type]
 
 
-# --- Deflated Sharpe Ratio ---------------------------------------------------
+# --- Deflated Sharpe & bootstrap CIs ------------------------------------------
 
 
 def test_normal_ppf_inverts_normal_cdf():
@@ -432,3 +434,46 @@ def test_returns_moments_normal_reference():
 def test_returns_moments_degenerate_cases():
     assert returns_moments(np.array([0.01])) == (0.0, 3.0)  # n < 2
     assert returns_moments(np.array([0.01, 0.01, 0.01])) == (0.0, 3.0)  # sigma 0
+
+
+def test_sharpe_ci_is_deterministic_for_a_seed():
+    rng = np.random.default_rng(123)
+    returns = rng.normal(0.001, 0.01, size=300)
+    ci_a = sharpe_confidence_interval(returns, 252.0, n_resamples=200, seed=99)
+    ci_b = sharpe_confidence_interval(returns, 252.0, n_resamples=200, seed=99)
+    assert ci_a == ci_b
+
+
+def test_sharpe_ci_straddles_the_true_sharpe():
+    # iid returns with a known annualised Sharpe: the bootstrap interval should
+    # contain the point estimate computed from the same sample.
+    rng = np.random.default_rng(2024)
+    returns = rng.normal(0.0005, 0.01, size=1000)
+    point = calculate_sharpe_ratio(returns, periods=252.0)
+    lo, hi = sharpe_confidence_interval(returns, 252.0, n_resamples=500, seed=5)
+    assert lo <= point <= hi
+
+
+def test_sharpe_ci_narrows_with_more_data():
+    rng = np.random.default_rng(11)
+    small = rng.normal(0.0005, 0.01, size=250)
+    large = rng.normal(0.0005, 0.01, size=1000)
+    lo_s, hi_s = sharpe_confidence_interval(small, 252.0, n_resamples=500, seed=3)
+    lo_l, hi_l = sharpe_confidence_interval(large, 252.0, n_resamples=500, seed=3)
+    assert (hi_l - lo_l) < (hi_s - lo_s)
+
+
+def test_sharpe_ci_too_few_returns():
+    assert sharpe_confidence_interval(np.arange(5.0), 252.0) == (0.0, 0.0)
+
+
+def test_bootstrap_samples_share_the_rng_across_batches():
+    # Calling in two batches with a shared generator yields the same stream as
+    # one call of the combined size with a fresh generator on the same seed.
+    returns = np.random.default_rng(0).normal(0.0, 0.01, size=200)
+    rng_batched = np.random.default_rng(50)
+    batched = bootstrap_sharpe_samples(returns, 252.0, 30, rng_batched)
+    batched += bootstrap_sharpe_samples(returns, 252.0, 30, rng_batched)
+    rng_single = np.random.default_rng(50)
+    single = bootstrap_sharpe_samples(returns, 252.0, 60, rng_single)
+    assert batched == single
