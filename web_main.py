@@ -169,18 +169,24 @@ async def _grid_sharpe(
     periods_per_year,
 ):
     """
-    Runs the SMA parameter grid over [start, end] and returns a 2D list of
-    Sharpe ratios indexed [short_idx][long_idx]; cells where short >= long, or
-    that produce no usable curve, are None. Yields to the event loop between
-    runs so the progress status can repaint, and returns (grid, runs_done).
+    Runs the SMA parameter grid over [start, end] and returns
+    ``(grid, moments, runs_done)``. ``grid`` is a 2D list of Sharpe ratios
+    indexed [short_idx][long_idx]; ``moments`` is a parallel grid of
+    ``(sr_period, n_obs, skew, kurt)`` tuples (per-period, non-annualised) for
+    the Deflated Sharpe Ratio. Cells where short >= long, or that produce no
+    usable curve, are None in both grids. Yields to the event loop between runs
+    so the progress status can repaint.
     """
     grid = []
+    moments = []
     runs_done = 0
     for short_w in OF_SHORT_WINDOWS:
         row = []
+        mrow = []
         for long_w in OF_LONG_WINDOWS:
             if short_w >= long_w:
                 row.append(None)
+                mrow.append(None)
                 continue
             events: deque[Event] = deque()
             data_handler = CSVDataHandler(
@@ -207,12 +213,27 @@ async def _grid_sharpe(
             )
             await backtest.run()
             stats = performance.create_summary_stats(portfolio)
-            row.append(None if "error" in stats else stats["sharpe_ratio"])
+            if "error" in stats:
+                row.append(None)
+                mrow.append(None)
+            else:
+                row.append(stats["sharpe_ratio"])
+                # Per-period Sharpe and higher moments of this run's per-bar
+                # equity returns, for the Deflated Sharpe of the IS-best cell.
+                df = portfolio.generate_equity_curve()
+                returns = df["total"].pct_change().dropna().to_numpy()
+                if len(returns) >= 2 and np.std(returns, ddof=1) > 0:
+                    sr_period = float(np.mean(returns) / np.std(returns, ddof=1))
+                    skew, kurt = performance.returns_moments(returns)
+                    mrow.append((sr_period, len(returns), skew, kurt))
+                else:
+                    mrow.append(None)
             runs_done += 1
             # Hand control back to the browser so the status text can update.
             await asyncio.sleep(0)
         grid.append(row)
-    return grid, runs_done
+        moments.append(mrow)
+    return grid, moments, runs_done
 
 
 def _rank_cells(grid):
@@ -288,7 +309,7 @@ async def analyse_overfitting(event):
         total = 2 * valid
 
         status_el.innerText = f"Analysing... 0/{total}"
-        is_grid, done_is = await _grid_sharpe(
+        is_grid, is_moments, done_is = await _grid_sharpe(
             symbol,
             is_start,
             is_end,
@@ -300,7 +321,7 @@ async def analyse_overfitting(event):
             periods_per_year,
         )
         status_el.innerText = f"Analysing... {done_is}/{total}"
-        oos_grid, _ = await _grid_sharpe(
+        oos_grid, _, _ = await _grid_sharpe(
             symbol,
             oos_start,
             oos_end,
@@ -327,6 +348,21 @@ async def analyse_overfitting(event):
             else None
         )
         _, oos_best_i, oos_best_j = oos_cells[0]
+
+        # Deflated Sharpe Ratio of the in-sample pick: correct the IS-best
+        # Sharpe for having tried this many configurations. Variance of the
+        # per-period Sharpes across all valid cells drives the deflation.
+        sr_periods = [m[0] for m_row in is_moments for m in m_row if m is not None]
+        n_trials = len(sr_periods)
+        sr_variance = float(np.var(sr_periods, ddof=1)) if n_trials >= 2 else 0.0
+        best_m = is_moments[is_best_i][is_best_j]
+        if best_m is not None and n_trials >= 2:
+            best_sr, best_n_obs, best_skew, best_kurt = best_m
+            dsr = performance.deflated_sharpe_ratio(
+                best_sr, sr_variance, n_trials, best_n_obs, best_skew, best_kurt
+            )
+        else:
+            dsr = 0.0
 
         payload = {
             "symbol": symbol,
@@ -356,6 +392,8 @@ async def analyse_overfitting(event):
             "is_best_is_sharpe": is_grid[is_best_i][is_best_j],
             "is_best_oos_sharpe": oos_grid[is_best_i][is_best_j],
             "oos_best_oos_sharpe": oos_grid[oos_best_i][oos_best_j],
+            "dsr": dsr,
+            "dsr_n_trials": n_trials,
         }
         window.updateHeatmaps(json.dumps(payload))
         status_el.innerHTML = '<i class="fa-solid fa-check text-success"></i>'
@@ -386,8 +424,9 @@ async def run_backtest(event):
     btn.disabled = True
     btn.innerText = "Running..."
 
-    # Clear previous logs
+    # Clear previous logs and the bootstrap-CI caption from any prior run.
     document.getElementById("order-log-body").innerHTML = ""
+    document.getElementById("cap-sharpe-ci").innerText = ""
 
     try:
         ticker_select = document.getElementById("ticker-select")
@@ -511,6 +550,34 @@ async def run_backtest(event):
             document.getElementById(
                 "cap-sharpe"
             ).innerText = f"annualised @ {round(stats['periods_per_year'])} periods/yr"
+
+            # Bootstrap 95% CI on the annualised Sharpe: 500 stationary-bootstrap
+            # resamples in 10 batches of 50, yielding to the browser between
+            # batches so the tab stays responsive. Needs a reasonable sample;
+            # skipped (caption left empty) below 30 returns.
+            returns = (
+                portfolio.generate_equity_curve()["total"]
+                .pct_change()
+                .dropna()
+                .to_numpy()
+            )
+            if len(returns) >= 30:
+                status_el.innerText = "Bootstrapping Sharpe CI..."
+                rng = np.random.default_rng(42)
+                samples: list[float] = []
+                for _ in range(10):
+                    samples.extend(
+                        performance.bootstrap_sharpe_samples(
+                            returns, stats["periods_per_year"], 50, rng
+                        )
+                    )
+                    await asyncio.sleep(0)
+                ci_lo = float(np.percentile(samples, 2.5))
+                ci_hi = float(np.percentile(samples, 97.5))
+                document.getElementById(
+                    "cap-sharpe-ci"
+                ).innerText = f"95% CI [{ci_lo:.2f}, {ci_hi:.2f}] (bootstrap)"
+
             document.getElementById(
                 "val-drawdown"
             ).innerText = f"{stats['max_drawdown'] * 100:.2f}%"

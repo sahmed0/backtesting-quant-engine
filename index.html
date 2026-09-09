@@ -639,6 +639,16 @@
       color: var(--accent);
     }
 
+    .dsr-good {
+      color: #16a34a;
+      font-weight: 700;
+    }
+
+    .dsr-bad {
+      color: #dc2626;
+      font-weight: 700;
+    }
+
     @media (max-width: 800px) {
       .heatmap-grids {
         grid-template-columns: 1fr;
@@ -875,6 +885,7 @@
             <div class="metric-header"><span>Sharpe Ratio</span> <i class="fa-solid fa-scale-balanced"></i></div>
             <div class="metric-value" id="val-sharpe">-</div>
             <div class="metric-caption" id="cap-sharpe"></div>
+            <div class="metric-caption" id="cap-sharpe-ci"></div>
           </div>
           <div class="metric-box">
             <div class="metric-header"><span>Max Drawdown</span> <i class="fa-solid fa-arrow-trend-down"></i></div>
@@ -1403,6 +1414,16 @@
           ? `Here the in-sample choice happened to hold up — a robust sign.`
           : `The bright in-sample spike does not survive: that collapse, and the ` +
             `fact the winning cell moves, is curve over-fitting made visible.`);
+
+      if (p.dsr !== undefined && p.dsr !== null) {
+        const dsrClass = p.dsr >= 0.95 ? 'dsr-good' : 'dsr-bad';
+        document.getElementById('of-verdict').innerHTML +=
+          ` After accounting for having tried <strong>${p.dsr_n_trials}</strong> ` +
+          `configurations, the Deflated Sharpe Ratio of the in-sample pick is ` +
+          `<span class="${dsrClass}">${p.dsr.toFixed(2)}</span> — the probability ` +
+          `its edge is real rather than selection luck. Below 0.95, treat it as ` +
+          `indistinguishable from noise.`;
+      }
     };
   </script>
 </body>
