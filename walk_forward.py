@@ -238,6 +238,13 @@ def main():
         f"MaxDD {wf_maxdd * 100:6.2f}%   over {len(all_returns)} OOS bars"
     )
 
+    # Stationary-bootstrap 95% CI on the stitched OOS Sharpe: how much of that
+    # headline is sampling noise. 1000 resamples in the CLI.
+    ci_lo, ci_hi = performance.sharpe_confidence_interval(
+        all_returns, ppy, n_resamples=1000
+    )
+    print(f"  Bootstrap 95% CI on OOS Sharpe: [{ci_lo:6.2f}, {ci_hi:6.2f}]")
+
     # Naive benchmark: optimise once over the entire history. Its headline is
     # in-sample (scored on the very data it was tuned on), so it is the number a
     # naive backtest would over-report.
