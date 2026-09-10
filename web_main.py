@@ -1,7 +1,6 @@
 import asyncio
 import csv
 import json
-import logging
 import os
 import re
 import traceback
@@ -17,7 +16,6 @@ from data import CSVDataHandler
 from engine import Backtest
 from event import Event
 from execution import SimulatedExecutionHandler
-from execution import logger as execution_logger
 from portfolio import Portfolio
 from position_sizing import (
     ATRStopSizer,
@@ -51,65 +49,47 @@ def build_sizer(choice, periods_per_year):
     return PercentEquitySizer(fraction=0.1)
 
 
-# Logging handler to push logs to the UI Table
-class WebOrderBookHandler(logging.Handler):
-    def __init__(self, table_body_id):
-        super().__init__()
-        self.table_body_id = table_body_id
-        # Regex to parse specifically the "FILLED" message from execution.py
-        self.pattern = re.compile(
-            r"FILLED\s+(?P<time>.*?)\s+(?P<side>LONG|SHORT|EXIT)\s+(?P<qty>.*?)\s+(?P<symbol>.*?)\s+@\s+(?P<price>.*?)\s+\(comm:\s+(?P<comm>.*?),\s+slippage:\s+(?P<slip>.*?)\)"
-        )
+def _set_icon(element, icon_class, text=""):
+    """Sets an element's content to a Font Awesome ``<i>`` plus optional text,
+    built from DOM nodes rather than a raw markup string (no injection path)."""
+    icon = document.createElement("i")
+    icon.className = icon_class
+    if text:
+        element.replaceChildren(icon, document.createTextNode(text))
+    else:
+        element.replaceChildren(icon)
 
-    def emit(self, record):
-        msg = self.format(record)
-        match = self.pattern.search(msg)
 
-        if match:
-            data = match.groupdict()
-            self.add_row_to_table(data)
-
-    def add_row_to_table(self, data):
-        tbody = document.getElementById(self.table_body_id)
-        if not tbody:
-            return
-
+def render_order_book(trades):
+    """Populates the Order Book table directly from ``portfolio.trades`` after a
+    run, newest fill first. Rows are built with ``createElement``/``textContent``
+    only - no log scraping, no raw markup. ``trades`` dicts carry every column
+    (see ``Portfolio.update_fill``)."""
+    tbody = document.getElementById("order-log-body")
+    if tbody is None:
+        return
+    tbody.replaceChildren()
+    for trade in reversed(trades):
+        direction = trade["direction"]
+        date_str = datetime.fromtimestamp(trade["timestamp"], UTC).strftime("%Y-%m-%d")
+        cells = [
+            (date_str, None),
+            (direction, f"dir-{direction.lower()}"),
+            (f"{trade['quantity']:.0f}", None),
+            (trade["symbol"], None),
+            (f"{trade['price']:.2f}", None),
+            (f"{trade['commission']:.4f}", None),
+            (f"{trade['slippage']:.4f}", None),
+        ]
         tr = document.createElement("tr")
+        for value, css_class in cells:
+            td = document.createElement("td")
+            td.textContent = value
+            if css_class:
+                td.className = css_class
+            tr.appendChild(td)
+        tbody.appendChild(tr)
 
-        # Determine CSS class for side
-        side_class = f"dir-{data['side'].lower()}"
-
-        # Simple formatting for time - extract just the date if it's a long timestamp string
-        # Assuming format like "2026-04-04 11:23:45.678000+00:00"
-        time_display = (
-            data["time"].split(".")[0] if "." in data["time"] else data["time"]
-        )
-        if " " in time_display:
-            time_display = time_display.split(" ")[
-                0
-            ]  # Just the date not the HH:MM:SS time
-
-        tr.innerHTML = f"""
-            <td>{time_display}</td>
-            <td class="{side_class}">{data["side"]}</td>
-            <td>{float(data["qty"]):.0f}</td>
-            <td>{data["symbol"]}</td>
-            <td>{float(data["price"]):.2f}</td>
-            <td>{float(data["comm"]):.4f}</td>
-            <td>{float(data["slip"]):.4f}</td>
-        """
-        # Prepend new trades to the top of the table
-        if tbody.firstChild:
-            tbody.insertBefore(tr, tbody.firstChild)
-        else:
-            tbody.appendChild(tr)
-
-
-# Initialise the handler but don't attach yet
-ui_handler = WebOrderBookHandler("order-log-body")
-ui_handler.setFormatter(logging.Formatter("%(message)s"))
-execution_logger.addHandler(ui_handler)
-execution_logger.propagate = False  # Prevent double logging to console
 
 # --- Overfitting Lab -------------------------------------------------------
 # Parameter grid searched for the in-sample / out-of-sample heatmaps. The lab
@@ -131,7 +111,7 @@ async def _ensure_symbol(file_input, ticker_select):
         file = files.item(0)
         text_content = await file.text()
         os.makedirs("/data", exist_ok=True)
-        symbol = os.path.splitext(file.name)[0]
+        symbol = re.sub(r"[^A-Za-z0-9._=-]", "_", os.path.splitext(file.name)[0])
         with open(f"/data/{symbol}.csv", "w", encoding="utf-8") as f:
             f.write(text_content)
         return symbol
@@ -257,11 +237,7 @@ async def analyse_overfitting(event):
     error_output.innerText = ""
     analyse_btn.disabled = True
     run_btn.disabled = True
-    analyse_btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analysing...'
-
-    # The grid runs dozens of backtests; mute per-fill logging so the Order Book
-    # table isn't flooded with the analysis's intermediate fills.
-    execution_logger.setLevel(logging.WARNING)
+    _set_icon(analyse_btn, "fa-solid fa-spinner fa-spin", " Analysing...")
 
     try:
         ticker_select = document.getElementById("ticker-select")
@@ -396,18 +372,16 @@ async def analyse_overfitting(event):
             "dsr_n_trials": n_trials,
         }
         window.updateHeatmaps(json.dumps(payload))
-        status_el.innerHTML = '<i class="fa-solid fa-check text-success"></i>'
+        _set_icon(status_el, "fa-solid fa-check text-success")
 
     except Exception as e:
         error_output.innerText = f"Error: {str(e)}\n{traceback.format_exc()}"
         status_el.innerText = "An error occurred during analysis."
     finally:
-        # Restore live fill logging for normal backtests.
-        execution_logger.setLevel(logging.INFO)
         analyse_btn.disabled = False
         run_btn.disabled = False
-        analyse_btn.innerHTML = (
-            '<i class="fa-solid fa-magnifying-glass-chart"></i> Analyse Overfitting'
+        _set_icon(
+            analyse_btn, "fa-solid fa-magnifying-glass-chart", " Analyse Overfitting"
         )
 
     return True
@@ -425,7 +399,7 @@ async def run_backtest(event):
     btn.innerText = "Running..."
 
     # Clear previous logs and the bootstrap-CI caption from any prior run.
-    document.getElementById("order-log-body").innerHTML = ""
+    document.getElementById("order-log-body").replaceChildren()
     document.getElementById("cap-sharpe-ci").innerText = ""
 
     try:
@@ -437,9 +411,10 @@ async def run_backtest(event):
             file = files.item(0)
             text_content = await file.text()
 
-            # Write to virtual file system
+            # Write to virtual file system. Sanitise the filename-derived symbol
+            # so it can't escape /data or inject odd characters downstream.
             os.makedirs("/data", exist_ok=True)
-            symbol = os.path.splitext(file.name)[0]
+            symbol = re.sub(r"[^A-Za-z0-9._=-]", "_", os.path.splitext(file.name)[0])
             csv_path = f"/data/{symbol}.csv"
 
             with open(csv_path, "w", encoding="utf-8") as f:
@@ -526,7 +501,8 @@ async def run_backtest(event):
         )
 
         # Await the execution of the async backtest. The engine yields to the
-        # browser periodically and calls back with its bar count.
+        # browser periodically and calls back with its bar count; the button
+        # text is left alone because app.js keys its busy state off it.
         def on_progress(bars: int) -> None:
             status_el.innerText = f"Running... {bars} bars"
 
@@ -626,6 +602,9 @@ async def run_backtest(event):
                     json.dumps(trades),
                     json.dumps(benchmark),
                 )
+
+            # Build the Order Book straight from the recorded fills (newest first).
+            render_order_book(portfolio.trades)
 
             status_el.innerText = "Backtest Complete"
 
