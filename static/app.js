@@ -131,21 +131,24 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
   formatMetricColor('val-cagr', document.getElementById('val-cagr').innerText);
   formatMetricColor('val-alpha', document.getElementById('val-alpha').innerText);
 
-  const labels = timestamps.map(ts => new Date(ts * 1000).toLocaleDateString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric'
-  }));
+  // Charts use a real time axis: every series is an {x: epoch-ms, y} point
+  // array, so duplicate calendar dates stay distinct and no locale date
+  // strings are ever built.
+  const equityPoints = timestamps.map((ts, i) => ({ x: ts * 1000, y: equity[i] }));
+  const pricePoints = timestamps.map((ts, i) => ({ x: ts * 1000, y: prices[i] }));
+  const benchmarkPoints = benchmark.length
+    ? timestamps.map((ts, i) => ({ x: ts * 1000, y: benchmark[i] }))
+    : [];
 
   const buyData = [];
   const sellData = [];
 
   trades.forEach(trade => {
-    const dateStr = new Date(trade.timestamp * 1000).toLocaleDateString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric'
-    });
+    const point = { x: trade.timestamp * 1000, y: trade.price, quantity: trade.quantity };
     if (trade.direction === 'LONG') {
-      buyData.push({ x: dateStr, y: trade.price, quantity: trade.quantity });
+      buyData.push(point);
     } else if (trade.direction === 'SHORT' || trade.direction === 'EXIT') {
-      sellData.push({ x: dateStr, y: trade.price, quantity: trade.quantity });
+      sellData.push(point);
     }
   });
 
@@ -161,11 +164,10 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
   equityChartInstance = new Chart(ctxEquity, {
     type: 'line',
     data: {
-      labels: labels,
       datasets: [
         {
           label: 'Portfolio Equity ($)',
-          data: equity,
+          data: equityPoints,
           borderColor: '#ff0051',
           backgroundColor: equityGradient,
           borderWidth: 2,
@@ -176,7 +178,7 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
         },
         {
           label: 'Buy & Hold ($)',
-          data: benchmark,
+          data: benchmarkPoints,
           borderColor: '#9333ea',
           borderWidth: 1.5,
           borderDash: [6, 4],
@@ -205,7 +207,7 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
         }
       },
       scales: {
-        x: { display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+        x: { type: 'time', time: { tooltipFormat: 'MMM d, yyyy' }, display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
         y: { display: true, border: { dash: [4, 4] }, grid: { color: 'rgba(0,0,0,0.05)' } }
       }
     }
@@ -222,12 +224,11 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
   priceChartInstance = new Chart(ctxPrice, {
     type: 'line',
     data: {
-      labels: labels,
       datasets: [
         {
           type: 'line',
           label: 'Asset Price ($)',
-          data: prices,
+          data: pricePoints,
           borderColor: '#334155',
           borderWidth: 2,
           pointRadius: 0,
@@ -284,13 +285,13 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
                 const t = context.raw;
                 return `${context.dataset.label}: $${t.y.toFixed(2)} (Qty: ${t.quantity})`;
               }
-              return `Price: $${context.raw.toFixed(2)}`;
+              return `Price: $${context.raw.y.toFixed(2)}`;
             }
           }
         }
       },
       scales: {
-        x: { display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+        x: { type: 'time', time: { tooltipFormat: 'MMM d, yyyy' }, display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
         y: { display: true, border: { dash: [4, 4] }, grid: { color: 'rgba(0,0,0,0.05)' } }
       }
     }
