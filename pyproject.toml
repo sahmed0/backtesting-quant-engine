@@ -20,6 +20,10 @@ dev = [
     "mypy",
     "yfinance",
     "tqdm",
+    # Cross-validation reference engine. Pinned exactly so the backtrader
+    # comparison is reproducible. CLI-only - never imported by the engine or
+    # the browser bundle.
+    "backtrader==1.9.78.123",
 ]
 
 [tool.ruff]
@@ -28,6 +32,11 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# The validation scripts bootstrap sys.path with the repo root before importing
+# the engine modules, so their engine imports legitimately follow a statement.
+"validation/*" = ["E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -61,7 +70,7 @@ disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 # Third-party packages that ship no type information.
-module = ["pandas.*", "yfinance.*", "tqdm.*"]
+module = ["pandas.*", "yfinance.*", "tqdm.*", "backtrader.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]
