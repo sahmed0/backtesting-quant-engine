@@ -70,8 +70,26 @@ jobs:
       - name: Pytest
         run: uv run pytest -m "not network" --cov --cov-report=term
 
+  cross-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --group dev
+
+      - name: Cross-validate against backtrader
+        run: uv run python validation/cross_validate.py --ci
+
   deploy:
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, cross-validate]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
 
