@@ -13,7 +13,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&display=swap"
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kiwicarbon/assets/dist/kiwi.css">
@@ -31,286 +31,320 @@
 
 <body>
 
-  <div class="dashboard-container">
+  <div class="app-shell">
 
-    <div class="sidebar">
-      <div class="glass-card">
-        <h1>QuantEngine
-        </h1>
-        <p>Event-driven Trading Strategy Backtesting Engine. <br>Choose between a Moving Average crossover and an
-          Ornstein-Uhlenbeck mean-reversion strategy.</p>
-        <div class="social-icons" style="margin-bottom: 20px;">
-          <a href="https://sajidahmed.co.uk" target="_blank" rel="noopener"><i class="kiwi-logo"></i></a>
-          <a href="https://github.com/sahmed0/backtesting-quant-engine.git" target="_blank" aria-label="GitHub"><i
-              class="fa-brands fa-github"></i></a>
-          <a href="https://linkedin.com/in/s-ahmed1" target="_blank" aria-label="LinkedIn"><i
-              class="fa-brands fa-linkedin"></i></a>
-        </div>
-
-        <div id="status">
-          <div class="pulse"></div> Initialising Engine
-        </div>
-
-        <div class="input-group" style="margin-bottom: 15px;">
-          <label for="strategy-select"><i class="fa-solid fa-brain"></i> Strategy</label>
-          <select id="strategy-select">
-            <option value="sma">Moving Average Crossover</option>
-            <option value="ou">Ornstein-Uhlenbeck (Mean Reversion)</option>
-          </select>
-        </div>
-
-        <div class="input-group" id="sma-params" style="margin-bottom: 15px;">
-          <label><i class="fa-solid fa-sliders"></i> Moving Average Windows</label>
-          <div class="param-row">
-            <div class="param-field">
-              <span>Short Window</span>
-              <input type="number" id="sma-short" value="5" min="1" step="1">
-            </div>
-            <div class="param-field">
-              <span>Long Window</span>
-              <input type="number" id="sma-long" value="20" min="2" step="1">
-            </div>
-          </div>
-        </div>
-
-        <div class="input-group" id="ou-params" style="margin-bottom: 15px; display: none;">
-          <label><i class="fa-solid fa-sliders"></i> OU Parameters</label>
-          <div class="param-row">
-            <div class="param-field">
-              <span>Window</span>
-              <input type="number" id="ou-window" value="60" min="10" step="1">
-            </div>
-            <div class="param-field">
-              <span>Entry Z</span>
-              <input type="number" id="ou-entry-z" value="2.0" min="0" step="0.1">
-            </div>
-            <div class="param-field">
-              <span>Exit Z</span>
-              <input type="number" id="ou-exit-z" value="0.0" step="0.1">
-            </div>
-          </div>
-        </div>
-
-        <div class="input-group" style="margin-bottom: 15px;">
-          <label for="sizer-select"><i class="fa-solid fa-scale-balanced"></i> Position Sizing</label>
-          <select id="sizer-select">
-            <option value="percent">Percent of Equity (10%)</option>
-            <option value="vol">Volatility Target (15%)</option>
-            <option value="atr">ATR-Stop Fixed Risk (2%)</option>
-            <option value="kelly">Fractional Kelly (½)</option>
-            <option value="fixed">Fixed (100 units)</option>
-          </select>
-        </div>
-
-        <div class="input-group" style="margin-bottom: 15px;">
-          <label><i class="fa-solid fa-coins"></i> Capital &amp; Costs</label>
-          <div class="param-row">
-            <div class="param-field">
-              <span>Initial Capital ($)</span>
-              <input type="number" id="initial-capital" value="100000" min="1" step="1000">
-            </div>
-          </div>
-          <div class="param-row" style="margin-top: 10px;">
-            <div class="param-field">
-              <span>Commission ($/share)</span>
-              <input type="number" id="commission-per-share" value="0.005" min="0" step="0.001">
-            </div>
-            <div class="param-field">
-              <span>Min commission ($)</span>
-              <input type="number" id="min-commission" value="1.00" min="0" step="0.1">
-            </div>
-            <div class="param-field">
-              <span>Slippage (%)</span>
-              <input type="number" id="slippage" value="0.05" min="0" step="0.01">
-            </div>
-          </div>
-        </div>
-
-        <div class="input-group" style="margin-bottom: 15px;">
-          <label for="allow-short">
-            <input type="checkbox" id="allow-short" />
-            Allow short selling
-          </label>
-        </div>
-
-        <div class="input-group">
-          <label for="ticker-select"><i class="fa-solid fa-list"></i> Pre-loaded Ticker</label>
-          <select id="ticker-select">
-            <option value="">-- Select a Ticker --</option>
-            <option value="AAPL">AAPL (Apple Inc.)</option>
-            <option value="AMZN">AMZN (Amazon Inc.)</option>
-            <option value="BTC-USD">BTC-USD (Bitcoin)</option>
-            <option value="CL=F">CL=F (WTI Crude Futures)</option>
-            <option value="GC=F">GC=F (Gold Futures)</option>
-            <option value="GOOG">GOOG (Alphabet Inc.)</option>
-            <option value="JPM">JPM (JPMorgan Chase)</option>
-            <option value="META">META (Meta Platforms Inc.)</option>
-            <option value="MSFT">MSFT (Microsoft Corp.)</option>
-            <option value="NVDA">NVDA (NVIDIA Corp.)</option>
-            <option value="TSLA">TSLA (Tesla Inc.)</option>
-            <option value="WMT">WMT (Walmart Inc.)</option>
-          </select>
-        </div>
-
-        <div class="input-group" style="margin-top: 15px;">
-          <label for="csv-upload"><i class="fa-solid fa-file-csv"></i> Custom CSV Data</label>
-          <div class="file-upload-wrapper">
-            <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; color: #a0aec0; margin-bottom: 10px;"></i>
-            <div style="font-size: 0.9rem; color: #475569;">Click or Drag & Drop to Upload</div>
-            <input type="file" id="csv-upload" accept=".csv">
-          </div>
-          <button id="clear-upload" class="btn-clear" style="display: none;"><i class="fa-solid fa-trash"></i> Remove
-            File</button>
-        </div>
-
-        <button id="run-btn" disabled style="margin-top: 25px;">
-          <i class="fa-solid fa-play"></i> Execute Backtest
-        </button>
-
-        <button id="analyse-btn" class="btn-analyse" disabled style="margin-top: 12px;">
-          <i class="fa-solid fa-magnifying-glass-chart"></i> Analyse Overfitting
-        </button>
+    <header class="topbar">
+      <div class="topbar-brand">
+        <span class="brand-mark"><i class="fa-solid fa-chart-line"></i> QuantEngine</span>
+        <span class="brand-sub">Event-driven strategy backtesting engine</span>
       </div>
+
+      <a class="validation-badge" href="https://github.com/sahmed0/backtesting-quant-engine/blob/main/validation/RESULTS.md"
+        target="_blank" rel="noopener"
+        title="Every fill and the final equity cross-checked bar-for-bar against backtrader 1.9.78.123 on a 372-trade SMA(5,20) run: 0 mismatches, equity agrees to within 2.5e-16.">
+        <i class="fa-solid fa-circle-check"></i> Validated vs backtrader
+      </a>
+
+      <div id="status" class="status-pill">
+        <span class="pulse"></span> Initialising Engine
+      </div>
+
+      <div class="social-icons topbar-social">
+        <a href="https://sajidahmed.co.uk" target="_blank" rel="noopener" aria-label="Portfolio"><i class="kiwi-logo"></i></a>
+        <a href="https://github.com/sahmed0/backtesting-quant-engine.git" target="_blank" aria-label="GitHub"><i
+            class="fa-brands fa-github"></i></a>
+        <a href="https://linkedin.com/in/s-ahmed1" target="_blank" aria-label="LinkedIn"><i
+            class="fa-brands fa-linkedin"></i></a>
+      </div>
+    </header>
+
+    <div class="dashboard-container">
+
+      <aside class="sidebar">
+        <div class="panel">
+
+          <p class="panel-intro">Choose between a Moving Average crossover and an Ornstein-Uhlenbeck mean-reversion
+            strategy.</p>
+
+          <div class="ctrl-section">
+            <h3 class="ctrl-section-title"><i class="fa-solid fa-database"></i> Data Source</h3>
+            <div class="input-group">
+              <select id="ticker-select">
+                <option value="">-- Select a Ticker --</option>
+                <option value="AAPL">AAPL (Apple Inc.)</option>
+                <option value="AMZN">AMZN (Amazon Inc.)</option>
+                <option value="BTC-USD">BTC-USD (Bitcoin)</option>
+                <option value="CL=F">CL=F (WTI Crude Futures)</option>
+                <option value="GC=F">GC=F (Gold Futures)</option>
+                <option value="GOOG">GOOG (Alphabet Inc.)</option>
+                <option value="JPM">JPM (JPMorgan Chase)</option>
+                <option value="META">META (Meta Platforms Inc.)</option>
+                <option value="MSFT">MSFT (Microsoft Corp.)</option>
+                <option value="NVDA">NVDA (NVIDIA Corp.)</option>
+                <option value="TSLA">TSLA (Tesla Inc.)</option>
+                <option value="WMT">WMT (Walmart Inc.)</option>
+              </select>
+            </div>
+
+            <div class="input-group">
+              <div class="file-upload-wrapper">
+                <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                <div class="upload-caption">Click or Drag &amp; Drop to Upload</div>
+                <input type="file" id="csv-upload" accept=".csv">
+              </div>
+              <button id="clear-upload" class="btn-clear" style="display: none;"><i class="fa-solid fa-trash"></i>
+                Remove File</button>
+            </div>
+          </div>
+
+          <div class="ctrl-section">
+            <h3 class="ctrl-section-title"><i class="fa-solid fa-brain"></i> Strategy</h3>
+            <div class="input-group">
+              <select id="strategy-select">
+                <option value="sma">Moving Average Crossover</option>
+                <option value="ou">Ornstein-Uhlenbeck (Mean Reversion)</option>
+              </select>
+            </div>
+
+            <div class="input-group" id="sma-params">
+              <span class="input-group-label">Moving Average Windows</span>
+              <div class="param-row">
+                <div class="param-field">
+                  <span>Short Window</span>
+                  <input type="number" id="sma-short" value="5" min="1" step="1">
+                </div>
+                <div class="param-field">
+                  <span>Long Window</span>
+                  <input type="number" id="sma-long" value="20" min="2" step="1">
+                </div>
+              </div>
+            </div>
+
+            <div class="input-group" id="ou-params" style="display: none;">
+              <span class="input-group-label">OU Parameters</span>
+              <div class="param-row">
+                <div class="param-field">
+                  <span>Window</span>
+                  <input type="number" id="ou-window" value="60" min="10" step="1">
+                </div>
+                <div class="param-field">
+                  <span>Entry Z</span>
+                  <input type="number" id="ou-entry-z" value="2.0" min="0" step="0.1">
+                </div>
+                <div class="param-field">
+                  <span>Exit Z</span>
+                  <input type="number" id="ou-exit-z" value="0.0" step="0.1">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ctrl-section">
+            <h3 class="ctrl-section-title"><i class="fa-solid fa-scale-balanced"></i> Position Sizing</h3>
+            <div class="input-group">
+              <select id="sizer-select">
+                <option value="percent">Percent of Equity (10%)</option>
+                <option value="vol">Volatility Target (15%)</option>
+                <option value="atr">ATR-Stop Fixed Risk (2%)</option>
+                <option value="kelly">Fractional Kelly (½)</option>
+                <option value="fixed">Fixed (100 units)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="ctrl-section ctrl-section-dense">
+            <h3 class="ctrl-section-title"><i class="fa-solid fa-coins"></i> Capital &amp; Costs</h3>
+            <div class="input-group">
+              <div class="param-row">
+                <div class="param-field">
+                  <span>Initial Capital ($)</span>
+                  <input type="number" id="initial-capital" value="100000" min="1" step="1000">
+                </div>
+              </div>
+              <div class="param-row" style="margin-top: 10px;">
+                <div class="param-field">
+                  <span>Commission ($/share)</span>
+                  <input type="number" id="commission-per-share" value="0.005" min="0" step="0.001">
+                </div>
+                <div class="param-field">
+                  <span>Min commission ($)</span>
+                  <input type="number" id="min-commission" value="1.00" min="0" step="0.1">
+                </div>
+                <div class="param-field">
+                  <span>Slippage (%)</span>
+                  <input type="number" id="slippage" value="0.05" min="0" step="0.01">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ctrl-section">
+            <h3 class="ctrl-section-title"><i class="fa-solid fa-sliders"></i> Execution</h3>
+            <label class="toggle-row" for="allow-short">
+              <span>Allow short selling</span>
+              <span class="toggle-switch">
+                <input type="checkbox" id="allow-short" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </span>
+            </label>
+          </div>
+
+          <div class="ctrl-actions">
+            <button id="run-btn" class="btn-primary" disabled>
+              <i class="fa-solid fa-play"></i> Execute Backtest
+            </button>
+
+            <button id="analyse-btn" class="btn-secondary" disabled>
+              <i class="fa-solid fa-magnifying-glass-chart"></i> Analyse Overfitting
+            </button>
+            <p class="ctrl-actions-caption">Runs an independent parameter grid search on the current data source.</p>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+
+        <div class="panel">
+          <h2><i class="fa-solid fa-chart-pie"></i> Performance</h2>
+
+          <div id="results" class="metrics-wrap">
+            <div class="metrics-primary">
+              <div class="metric-box metric-box-lg">
+                <div class="metric-header"><span>Total Return</span> <i class="fa-solid fa-money-bill-trend-up"></i></div>
+                <div class="metric-value" id="val-return">-</div>
+              </div>
+              <div class="metric-box metric-box-lg">
+                <div class="metric-header"><span>Sharpe Ratio</span> <i class="fa-solid fa-scale-balanced"></i></div>
+                <div class="metric-value" id="val-sharpe">-</div>
+                <div class="metric-caption" id="cap-sharpe"></div>
+                <div class="metric-caption" id="cap-sharpe-ci"></div>
+              </div>
+              <div class="metric-box metric-box-lg">
+                <div class="metric-header"><span>Max Drawdown</span> <i class="fa-solid fa-arrow-trend-down"></i></div>
+                <div class="metric-value" id="val-drawdown">-</div>
+              </div>
+              <div class="metric-box metric-box-lg">
+                <div class="metric-header"><span>CAGR</span> <i class="fa-solid fa-seedling"></i></div>
+                <div class="metric-value" id="val-cagr">-</div>
+              </div>
+            </div>
+
+            <div class="metrics-secondary">
+              <div class="metric-box">
+                <div class="metric-header"><span>Win Rate (trades)</span> <i class="fa-solid fa-bullseye"></i></div>
+                <div class="metric-value" id="val-winrate">-</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-header"><span>Alpha</span> <i class="fa-solid fa-a"></i></div>
+                <div class="metric-value" id="val-alpha">-</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-header"><span>Information Ratio</span> <i class="fa-solid fa-circle-info"></i></div>
+                <div class="metric-value" id="val-inforatio">-</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-header"><span>Calmar Ratio</span> <i class="fa-solid fa-shield-halved"></i></div>
+                <div class="metric-value" id="val-calmar">-</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-header"><span>Number of Trades</span> <i class="fa-solid fa-hashtag"></i></div>
+                <div class="metric-value" id="val-trades">-</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-header"><span>Avg Trade Duration</span> <i class="fa-solid fa-clock"></i></div>
+                <div class="metric-value" id="val-duration">-</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="error-output"></div>
+
+          <div id="charts-card" style="display: none;">
+            <h2><i class="fa-solid fa-chart-line"></i> Portfolio Equity</h2>
+            <div class="chart-wrapper" id="wrap-equity">
+              <div class="chart-controls">
+                <button id="resetEquityZoom" class="action-btn reset-zoom"><i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button onclick="toggleFullscreen('wrap-equity', this)" class="action-btn"><i
+                    class="fa-solid fa-expand"></i></button>
+              </div>
+              <canvas id="equityChart"></canvas>
+            </div>
+
+            <h2><i class="fa-solid fa-chart-line"></i> Asset Price &amp; Executions</h2>
+            <div class="chart-wrapper" id="wrap-price">
+              <div class="chart-controls">
+                <button id="resetPriceZoom" class="action-btn reset-zoom"><i class="fa-solid fa-rotate-left"></i></button>
+                <button onclick="toggleFullscreen('wrap-price', this)" class="action-btn"><i
+                    class="fa-solid fa-expand"></i></button>
+              </div>
+              <canvas id="priceChart"></canvas>
+            </div>
+
+            <h2 class="section-heading-spaced"><i class="fa-solid fa-book"></i> Order Book</h2>
+            <div class="table-container">
+              <table id="order-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Side</th>
+                    <th>Qty</th>
+                    <th>Ticker</th>
+                    <th>Price ($)</th>
+                    <th>Commission</th>
+                    <th>Slippage</th>
+                  </tr>
+                </thead>
+                <tbody id="order-log-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="overfitting-card" style="display: none;">
+          <h2><i class="fa-solid fa-magnifying-glass-chart"></i> Overfitting Lab</h2>
+          <p id="of-intro">
+            The moving-average crossover is optimised on the first 70% of history
+            (in-sample), then every parameter pair is scored on the held-out final
+            30% (out-of-sample). Each cell is a (short, long) window pair, coloured
+            by Sharpe ratio on a shared scale. If the strategy were robust, the two
+            panels would look alike. They rarely do.
+          </p>
+
+          <div class="heatmap-grids">
+            <div class="heatmap-panel">
+              <h3>In-Sample <span>— what you optimised</span></h3>
+              <div id="heatmap-is" class="heatmap"></div>
+            </div>
+            <div class="heatmap-panel">
+              <h3>Out-of-Sample <span>— what actually happened</span></h3>
+              <div id="heatmap-oos" class="heatmap"></div>
+            </div>
+          </div>
+
+          <div class="heatmap-legend">
+            <div class="legend-item"><span class="legend-gradient"></span> low&nbsp;→&nbsp;high Sharpe</div>
+            <div class="legend-item"><span class="legend-swatch" style="background: transparent; outline: 3px solid #f59e0b; outline-offset: -3px;"></span> in-sample pick</div>
+            <div class="legend-item"><span class="legend-swatch" style="background: transparent; outline: 3px dashed #34d399; outline-offset: -3px;"></span> out-of-sample best (hindsight)</div>
+          </div>
+
+          <div id="of-verdict" class="of-verdict"></div>
+        </div>
+
+      </main>
     </div>
 
-    <div class="main-content">
-
-      <div class="glass-card">
-        <h2><i class="fa-solid fa-chart-pie"></i> Performance</h2>
-
-        <div id="results" class="metrics-container">
-          <div class="metric-box">
-            <div class="metric-header"><span>Total Return</span> <i class="fa-solid fa-money-bill-trend-up"></i></div>
-            <div class="metric-value" id="val-return">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-header"><span>Sharpe Ratio</span> <i class="fa-solid fa-scale-balanced"></i></div>
-            <div class="metric-value" id="val-sharpe">-</div>
-            <div class="metric-caption" id="cap-sharpe"></div>
-            <div class="metric-caption" id="cap-sharpe-ci"></div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-header"><span>Max Drawdown</span> <i class="fa-solid fa-arrow-trend-down"></i></div>
-            <div class="metric-value" id="val-drawdown">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-header"><span>Win Rate (trades)</span> <i class="fa-solid fa-bullseye"></i></div>
-            <div class="metric-value" id="val-winrate">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-header"><span>CAGR</span> <i class="fa-solid fa-seedling"></i></div>
-            <div class="metric-value" id="val-cagr">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-header"><span>Alpha</span> <i class="fa-solid fa-a"></i></div>
-            <div class="metric-value" id="val-alpha">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-header"><span>Information Ratio</span> <i class="fa-solid fa-circle-info"></i></div>
-            <div class="metric-value" id="val-inforatio">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-header"><span>Calmar Ratio</span> <i class="fa-solid fa-shield-halved"></i></div>
-            <div class="metric-value" id="val-calmar">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-header"><span>Number of Trades</span> <i class="fa-solid fa-hashtag"></i></div>
-            <div class="metric-value" id="val-trades">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-header"><span>Avg Trade Duration</span> <i class="fa-solid fa-clock"></i></div>
-            <div class="metric-value" id="val-duration">-</div>
-          </div>
-        </div>
-
-        <div id="error-output" style="color: var(--danger); margin-bottom: 15px; font-weight: 600;"></div>
-
-        <div id="charts-card" style="display: none;">
-          <h2><i class="fa-solid fa-chart-line"></i> Portfolio Equity</h2>
-          <div class="chart-wrapper" id="wrap-equity">
-            <div class="chart-controls">
-              <button id="resetEquityZoom" class="action-btn reset-zoom"><i class="fa-solid fa-rotate-left"></i>
-              </button>
-              <button onclick="toggleFullscreen('wrap-equity', this)" class="action-btn"><i
-                  class="fa-solid fa-expand"></i></button>
-            </div>
-            <canvas id="equityChart"></canvas>
-          </div>
-
-          <h2><i class="fa-solid fa-chart-line"></i> Asset Price & Executions</h2>
-          <div class="chart-wrapper" id="wrap-price">
-            <div class="chart-controls">
-              <button id="resetPriceZoom" class="action-btn reset-zoom"><i class="fa-solid fa-rotate-left"></i></button>
-              <button onclick="toggleFullscreen('wrap-price', this)" class="action-btn"><i
-                  class="fa-solid fa-expand"></i></button>
-            </div>
-            <canvas id="priceChart"></canvas>
-          </div>
-
-          <h2 style="margin-top: 30px;"><i class="fa-solid fa-book"></i> Order Book</h2>
-          <div class="table-container">
-            <table id="order-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Side</th>
-                  <th>Qty</th>
-                  <th>Ticker</th>
-                  <th>Price ($)</th>
-                  <th>Commission</th>
-                  <th>Slippage</th>
-                </tr>
-              </thead>
-              <tbody id="order-log-body">
-              </tbody>
-            </table>
-          </div>
-        </div>
+    <footer class="app-footer">
+      <div class="footer-legal">Sajid Ahmed 2026 &middot; Licensed under GNU GPL v3.0</div>
+      <div class="social-icons">
+        <a href="https://sajidahmed.co.uk" target="_blank" rel="noopener" aria-label="Portfolio"><i class="kiwi-logo"></i></a>
+        <a href="https://github.com/sahmed0/backtesting-quant-engine.git" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+        <a href="https://linkedin.com/in/s-ahmed1" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
       </div>
+    </footer>
 
-      <div class="glass-card" id="overfitting-card" style="display: none; margin-top: 20px;">
-        <h2><i class="fa-solid fa-magnifying-glass-chart"></i> Overfitting Lab</h2>
-        <p id="of-intro">
-          The moving-average crossover is optimised on the first 70% of history
-          (in-sample), then every parameter pair is scored on the held-out final
-          30% (out-of-sample). Each cell is a (short, long) window pair, coloured
-          by Sharpe ratio on a shared scale. If the strategy were robust, the two
-          panels would look alike. They rarely do.
-        </p>
-
-        <div class="heatmap-grids">
-          <div class="heatmap-panel">
-            <h3>In-Sample <span>— what you optimised</span></h3>
-            <div id="heatmap-is" class="heatmap"></div>
-          </div>
-          <div class="heatmap-panel">
-            <h3>Out-of-Sample <span>— what actually happened</span></h3>
-            <div id="heatmap-oos" class="heatmap"></div>
-          </div>
-        </div>
-
-        <div class="heatmap-legend">
-          <div class="legend-item"><span class="legend-gradient"></span> low&nbsp;→&nbsp;high Sharpe</div>
-          <div class="legend-item"><span class="legend-swatch" style="background: transparent; outline: 3px solid #f59e0b; outline-offset: -3px;"></span> in-sample pick</div>
-          <div class="legend-item"><span class="legend-swatch" style="background: transparent; outline: 3px dashed #047857; outline-offset: -3px;"></span> out-of-sample best (hindsight)</div>
-        </div>
-
-        <div id="of-verdict" class="of-verdict"></div>
-      </div>
-
-    </div>
   </div>
-
-  <footer>
-    <div style="font-size: 1rem; color: var(--text-muted);">
-      <strong>Sajid Ahmed 2026</strong> • Licensed under GNU GPL v3.0
-    </div>
-    <div class="social-icons">
-      <a href="https://sajidahmed.co.uk" target="_blank" rel="noopener"><i class="kiwi-logo"></i></a>
-      <a href="https://github.com/sahmed0/backtesting-quant-engine.git" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
-      <a href="https://linkedin.com/in/s-ahmed1" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
-    </div>
-  </footer>
 
   <py-config>
     packages = ["numpy", "pandas", "tqdm"]

@@ -55,8 +55,8 @@ const analyseBtn = document.getElementById('analyse-btn');
 const statusDiv = document.getElementById('status');
 
 // Global Chart.js Font override to match Theme
-Chart.defaults.font.family = "'Chakra Petch', sans-serif";
-Chart.defaults.color = '#475569';
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = '#8b96a5';
 
 function updateUIState() {
   const hasUpload = csvUpload.files.length > 0;
@@ -157,8 +157,8 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
 
   // Create Gradient for area under the curve
   let equityGradient = ctxEquity.createLinearGradient(0, 0, 0, 400);
-  equityGradient.addColorStop(0, 'rgba(255, 83, 137, 0.4)');
-  equityGradient.addColorStop(1, 'rgba(255, 83, 137, 0.0)');
+  equityGradient.addColorStop(0, 'rgba(59, 130, 246, 0.35)');
+  equityGradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
 
   if (equityChartInstance) equityChartInstance.destroy();
   equityChartInstance = new Chart(ctxEquity, {
@@ -168,7 +168,7 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
         {
           label: 'Portfolio Equity ($)',
           data: equityPoints,
-          borderColor: '#ff0051',
+          borderColor: '#3b82f6',
           backgroundColor: equityGradient,
           borderWidth: 2,
           fill: true,
@@ -179,7 +179,7 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
         {
           label: 'Buy & Hold ($)',
           data: benchmarkPoints,
-          borderColor: '#9333ea',
+          borderColor: '#a78bfa',
           borderWidth: 1.5,
           borderDash: [6, 4],
           fill: false,
@@ -208,7 +208,7 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
       },
       scales: {
         x: { type: 'time', time: { tooltipFormat: 'MMM d, yyyy' }, display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-        y: { display: true, border: { dash: [4, 4] }, grid: { color: 'rgba(0,0,0,0.05)' } }
+        y: { display: true, border: { dash: [4, 4], color: '#232a36' }, grid: { color: 'rgba(255,255,255,0.05)' } }
       }
     }
   });
@@ -229,7 +229,7 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
           type: 'line',
           label: 'Asset Price ($)',
           data: pricePoints,
-          borderColor: '#334155',
+          borderColor: '#c9d1d9',
           borderWidth: 2,
           pointRadius: 0,
           pointHoverRadius: 8,
@@ -241,8 +241,8 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
           type: 'scatter',
           label: 'Buy Signal',
           data: buyData,
-          backgroundColor: '#10b981',
-          borderColor: '#ffffff',
+          backgroundColor: '#34d399',
+          borderColor: '#0b0e14',
           borderWidth: 2,
           pointStyle: 'circle',
           pointRadius: 10,
@@ -252,8 +252,8 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
           type: 'scatter',
           label: 'Sell/Exit Signal',
           data: sellData,
-          backgroundColor: '#ef4444',
-          borderColor: '#ffffff',
+          backgroundColor: '#f87171',
+          borderColor: '#0b0e14',
           borderWidth: 2,
           pointStyle: 'triangle',
           rotation: 180,
@@ -292,7 +292,7 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
       },
       scales: {
         x: { type: 'time', time: { tooltipFormat: 'MMM d, yyyy' }, display: true, grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-        y: { display: true, border: { dash: [4, 4] }, grid: { color: 'rgba(0,0,0,0.05)' } }
+        y: { display: true, border: { dash: [4, 4], color: '#232a36' }, grid: { color: 'rgba(255,255,255,0.05)' } }
       }
     }
   });
@@ -304,14 +304,18 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
 };
 
 // --- Overfitting Lab heatmaps ---
-// Maps a Sharpe ratio to a diverging colour on a shared scale: pale near
-// zero, vivid green for strong positive, vivid red for negative.
+// Maps a Sharpe ratio to a diverging colour on a shared scale: muted slate
+// near zero, vivid green for strong positive, vivid red for negative. Tuned
+// to sit clearly above the dark page background while staying legible under
+// the fixed dark cell text at every point on the scale.
 function sharpeColor(s, scale) {
   if (s === null || s === undefined) return null;
   const t = Math.max(-1, Math.min(1, s / scale));
-  const hue = t >= 0 ? 150 : 350;
-  const light = 92 - 50 * Math.abs(t); // 92% (pale) -> 42% (vivid)
-  return `hsl(${hue}, 65%, ${light}%)`;
+  const a = Math.abs(t);
+  const hue = t >= 0 ? 150 : 355;
+  const sat = 12 + 55 * a;   // 12% (muted slate) -> 67% (vivid) at extremes
+  const light = 55 - 10 * a; // 55% (muted) -> 45% (vivid) at extremes
+  return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
 function renderHeatmap(containerId, grid, shortWins, longWins, pickCell, bestCell, scale) {
