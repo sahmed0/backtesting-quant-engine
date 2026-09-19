@@ -68,7 +68,14 @@
 
           <div class="ctrl-section">
             <h3 class="ctrl-section-title"><i class="fa-solid fa-database"></i> Data Source</h3>
-            <div class="input-group">
+            <div class="tab-switch" role="tablist">
+              <button type="button" class="tab-btn active" id="tab-btn-ticker" data-target="panel-ticker" role="tab"
+                aria-selected="true">Preset Ticker</button>
+              <button type="button" class="tab-btn" id="tab-btn-upload" data-target="panel-upload" role="tab"
+                aria-selected="false">Upload CSV</button>
+            </div>
+
+            <div class="tab-panel" id="panel-ticker" role="tabpanel">
               <select id="ticker-select">
                 <option value="">-- Select a Ticker --</option>
                 <option value="AAPL">AAPL (Apple Inc.)</option>
@@ -86,7 +93,7 @@
               </select>
             </div>
 
-            <div class="input-group">
+            <div class="tab-panel" id="panel-upload" role="tabpanel" style="display: none;">
               <div class="file-upload-wrapper">
                 <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
                 <div class="upload-caption">Click or Drag &amp; Drop to Upload</div>

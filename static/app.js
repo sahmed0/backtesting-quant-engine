@@ -99,6 +99,37 @@ clearBtn.addEventListener('click', function () {
   updateUIState();
 });
 
+// --- Data Source Tabs (Preset Ticker / Upload CSV) ---
+const tabButtons = document.querySelectorAll('.tab-btn');
+const panelTicker = document.getElementById('panel-ticker');
+const panelUpload = document.getElementById('panel-upload');
+
+tabButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.classList.contains('active')) return;
+
+    tabButtons.forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+
+    const showUpload = btn.id === 'tab-btn-upload';
+    panelTicker.style.display = showUpload ? 'none' : 'block';
+    panelUpload.style.display = showUpload ? 'block' : 'none';
+
+    // The tabs represent a single data-source choice: switching tabs clears
+    // whichever source just went out of view so the two stay mutually exclusive.
+    if (showUpload) {
+      tickerSelect.value = '';
+    } else if (csvUpload.files.length > 0) {
+      csvUpload.value = '';
+    }
+    updateUIState();
+  });
+});
+
 // --- Chart Generation Logic ---
 let equityChartInstance = null;
 let priceChartInstance = null;
