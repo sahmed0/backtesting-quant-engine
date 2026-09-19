@@ -133,6 +133,7 @@ tabButtons.forEach(btn => {
 // --- Chart Generation Logic ---
 let equityChartInstance = null;
 let priceChartInstance = null;
+let drawdownChartInstance = null;
 
 // Helper to colour code text elements based on positive/negative values
 function formatMetricColor(elementId, valueStr) {
@@ -248,6 +249,55 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
     equityChartInstance.resetZoom();
     document.getElementById('resetEquityZoom').style.display = 'none';
   };
+
+  // --- Drawdown (underwater) chart, sharing the equity chart's time range ---
+  let peakEquity = -Infinity;
+  const drawdownPoints = equityPoints.map(pt => {
+    peakEquity = Math.max(peakEquity, pt.y);
+    const pct = peakEquity > 0 ? ((pt.y - peakEquity) / peakEquity) * 100 : 0;
+    return { x: pt.x, y: pct };
+  });
+
+  const ctxDrawdown = document.getElementById('drawdownChart').getContext('2d');
+  let drawdownGradient = ctxDrawdown.createLinearGradient(0, 0, 0, 130);
+  drawdownGradient.addColorStop(0, 'rgba(248, 113, 113, 0.05)');
+  drawdownGradient.addColorStop(1, 'rgba(248, 113, 113, 0.45)');
+
+  if (drawdownChartInstance) drawdownChartInstance.destroy();
+  drawdownChartInstance = new Chart(ctxDrawdown, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Drawdown',
+        data: drawdownPoints,
+        borderColor: '#f87171',
+        backgroundColor: drawdownGradient,
+        borderWidth: 1.5,
+        fill: true,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        tension: 0.15
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `Drawdown: ${ctx.raw.y.toFixed(2)}%` } }
+      },
+      scales: {
+        x: { type: 'time', display: false },
+        y: {
+          display: true, max: 0,
+          border: { dash: [4, 4], color: '#232a36' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { callback: v => `${v}%`, maxTicksLimit: 3 }
+        }
+      }
+    }
+  });
 
   // --- 2. Price Chart ---
   const ctxPrice = document.getElementById('priceChart').getContext('2d');

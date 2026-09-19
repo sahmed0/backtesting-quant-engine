@@ -689,6 +689,25 @@ button:disabled {
   /* Prevents internal canvas from pushing boundaries */
 }
 
+.chart-wrapper-sub {
+  height: 130px;
+  max-height: 130px;
+  margin-bottom: 30px;
+  padding-top: 10px;
+}
+
+.chart-subtitle {
+  position: absolute;
+  top: 10px;
+  left: 15px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-tertiary);
+  z-index: 5;
+}
+
 /* Fullscreen overrides */
 .chart-wrapper:fullscreen,
 .chart-wrapper:-webkit-full-screen {
@@ -988,6 +1007,11 @@ tr:hover td {
 
   .chart-wrapper {
     height: 350px;
+  }
+
+  .chart-wrapper-sub {
+    height: 110px;
+    max-height: 110px;
   }
 
   .app-footer {
