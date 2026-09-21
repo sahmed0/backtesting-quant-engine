@@ -184,6 +184,30 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
     }
   });
 
+  // Pair each entry with its exit so the price chart can draw a connecting
+  // segment coloured by whether that round-trip made or lost money. A single
+  // dataset is used with a null point breaking the line between pairs, so
+  // this stays cheap even with hundreds of trades.
+  const pairData = [];
+  const pairWin = [];
+  let openTrade = null;
+  trades.forEach(trade => {
+    if (trade.direction === 'LONG' || trade.direction === 'SHORT') {
+      openTrade = trade;
+    } else if (trade.direction === 'EXIT' && openTrade) {
+      const won = openTrade.direction === 'LONG'
+        ? trade.price >= openTrade.price
+        : trade.price <= openTrade.price;
+      pairData.push({ x: openTrade.timestamp * 1000, y: openTrade.price });
+      pairWin.push(won);
+      pairData.push({ x: trade.timestamp * 1000, y: trade.price });
+      pairWin.push(won);
+      pairData.push({ x: trade.timestamp * 1000, y: null });
+      pairWin.push(won);
+      openTrade = null;
+    }
+  });
+
   // --- 1. Equity Chart with Canvas Gradient ---
   const ctxEquity = document.getElementById('equityChart').getContext('2d');
 
@@ -308,6 +332,24 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
       datasets: [
         {
           type: 'line',
+          label: 'Round-trip P&L',
+          data: pairData,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          fill: false,
+          spanGaps: false,
+          order: 3,
+          segment: {
+            borderColor: ctx => {
+              const won = pairWin[ctx.p0DataIndex];
+              if (won === undefined) return 'transparent';
+              return won ? 'rgba(52, 211, 153, 0.55)' : 'rgba(248, 113, 113, 0.55)';
+            }
+          }
+        },
+        {
+          type: 'line',
           label: 'Asset Price ($)',
           data: pricePoints,
           borderColor: '#c9d1d9',
@@ -348,7 +390,13 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, padding: 10 } },
+        legend: {
+          position: 'top',
+          labels: {
+            usePointStyle: true, boxWidth: 8, padding: 10,
+            filter: item => item.text !== 'Round-trip P&L'
+          }
+        },
         zoom: {
           pan: {
             enabled: true, mode: 'x',
@@ -360,6 +408,7 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
           }
         },
         tooltip: {
+          filter: item => item.dataset.label !== 'Round-trip P&L',
           callbacks: {
             label: function (context) {
               if (context.dataset.type === 'scatter') {
