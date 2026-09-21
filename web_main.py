@@ -396,7 +396,7 @@ async def run_backtest(event):
     error_output.innerText = ""
     status_el.innerText = "Reading data..."
     btn.disabled = True
-    btn.innerText = "Running..."
+    _set_icon(btn, "fa-solid fa-spinner fa-spin", " Running...")
 
     # Clear previous logs and the bootstrap-CI caption from any prior run.
     document.getElementById("order-log-body").replaceChildren()
@@ -429,7 +429,7 @@ async def run_backtest(event):
         else:
             status_el.innerText = "No data source selected."
             btn.disabled = False
-            btn.innerText = "Run Backtest"
+            _set_icon(btn, "fa-solid fa-play", " Run Backtest")
             return
 
         # Initialise backtest components
@@ -613,7 +613,7 @@ async def run_backtest(event):
         status_el.innerText = "An error occurred during execution."
     finally:
         btn.disabled = False
-        btn.innerText = "Run Backtest"
+        _set_icon(btn, "fa-solid fa-play", " Run Backtest")
 
     return True
 

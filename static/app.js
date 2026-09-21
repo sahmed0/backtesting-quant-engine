@@ -130,6 +130,64 @@ tabButtons.forEach(btn => {
   });
 });
 
+// --- Motion helpers (count-up, staggered reveal) ---
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Animates a metric box's text from 0 up to whatever value is already
+// sitting in the element (set synchronously by web_main.py just before this
+// runs), preserving its exact formatting (decimals, %, "days", etc).
+function animateMetricValue(el, duration = 700) {
+  const targetText = el.textContent.trim();
+  if (prefersReducedMotion) return;
+
+  const match = targetText.match(/^(-?[\d,]+\.?\d*)(.*)$/);
+  if (!match) return; // e.g. the "-" placeholder before any run
+
+  const targetNum = parseFloat(match[1].replace(/,/g, ''));
+  if (Number.isNaN(targetNum)) return;
+
+  const suffix = match[2];
+  const decimals = (match[1].split('.')[1] || '').length;
+  const startTime = performance.now();
+
+  function frame(now) {
+    const t = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    el.textContent = (targetNum * eased).toFixed(decimals) + suffix;
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      el.textContent = targetText; // snap to the exact original string
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+// Restarts the CSS reveal-in animation on a set of elements, staggered by
+// index, so results feel like they land rather than snap into place.
+function reveal(elements, staggerMs = 40) {
+  if (prefersReducedMotion) return;
+  elements.forEach((el, i) => {
+    if (!el) return;
+    el.classList.remove('reveal-in');
+    void el.offsetWidth; // force reflow so the animation restarts
+    el.style.animationDelay = `${i * staggerMs}ms`;
+    el.classList.add('reveal-in');
+  });
+}
+
+// --- Loading skeleton: shown while the first backtest of a session runs ---
+const chartsSkeleton = document.getElementById('charts-skeleton');
+
+new MutationObserver(() => {
+  const isRunning = runBtn.disabled && runBtn.innerText.includes('Running');
+  if (isRunning && document.getElementById('charts-card').style.display !== 'block') {
+    chartsSkeleton.style.display = 'block';
+  } else {
+    chartsSkeleton.style.display = 'none';
+  }
+}).observe(runBtn, { attributes: true, attributeFilter: ['disabled'] });
+
 // --- Chart Generation Logic ---
 let equityChartInstance = null;
 let priceChartInstance = null;
@@ -148,8 +206,12 @@ function formatMetricColor(elementId, valueStr) {
   }
 }
 
+const HEADLINE_METRIC_IDS = ['val-return', 'val-sharpe', 'val-drawdown', 'val-cagr'];
+const SECONDARY_METRIC_IDS = ['val-winrate', 'val-alpha', 'val-inforatio', 'val-calmar', 'val-trades', 'val-duration'];
+
 window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJSON, benchmarkJSON) {
   document.getElementById('charts-card').style.display = 'block';
+  chartsSkeleton.style.display = 'none';
   statusDiv.innerHTML = '<i class="fa-solid fa-check text-success"></i>';
 
   const timestamps = JSON.parse(timestampsJSON);
@@ -162,6 +224,17 @@ window.updateCharts = function (timestampsJSON, equityJSON, pricesJSON, tradesJS
   formatMetricColor('val-return', document.getElementById('val-return').innerText);
   formatMetricColor('val-cagr', document.getElementById('val-cagr').innerText);
   formatMetricColor('val-alpha', document.getElementById('val-alpha').innerText);
+
+  // Count the headline/secondary metric values up from zero, and stagger the
+  // metric boxes and chart panels in, so a completed run feels like it lands.
+  HEADLINE_METRIC_IDS.concat(SECONDARY_METRIC_IDS).forEach(id => animateMetricValue(document.getElementById(id)));
+  reveal(document.querySelectorAll('.metric-box'));
+  reveal([
+    document.getElementById('wrap-equity'),
+    document.getElementById('wrap-drawdown'),
+    document.getElementById('wrap-price'),
+    document.querySelector('.table-container')
+  ], 90);
 
   // Charts use a real time axis: every series is an {x: epoch-ms, y} point
   // array, so duplicate calendar dates stay distinct and no locale date
@@ -489,6 +562,8 @@ window.updateHeatmaps = function (payloadJSON) {
   renderHeatmap('heatmap-is', p.is_sharpe, p.short_windows, p.long_windows, p.is_best, null, maxAbs);
   renderHeatmap('heatmap-oos', p.oos_sharpe, p.short_windows, p.long_windows, p.is_best, p.oos_best, maxAbs);
 
+  reveal(document.querySelectorAll('.heatmap-panel'), 120);
+
   const [ps, pl] = p.is_best_params;
   const [bs, bl] = p.oos_best_params;
   const isSh = p.is_best_is_sharpe, oosSh = p.is_best_oos_sharpe;
@@ -518,4 +593,6 @@ window.updateHeatmaps = function (payloadJSON) {
       `its edge is real rather than selection luck. Below 0.95, treat it as ` +
       `indistinguishable from noise.`;
   }
+
+  reveal([document.getElementById('of-verdict')], 0);
 };

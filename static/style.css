@@ -673,6 +673,83 @@ button:disabled {
   border: none;
 }
 
+/* --- Loading skeleton (shown while a backtest is running, pre-first-result) --- */
+.skeleton-charts {
+  margin-bottom: 18px;
+}
+
+.skeleton-block {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+}
+
+.skeleton-block-chart {
+  height: 300px;
+}
+
+.skeleton-block-table {
+  height: 150px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+}
+
+.skeleton-row {
+  position: relative;
+  overflow: hidden;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--border);
+  width: 100%;
+}
+
+.skeleton-row:nth-child(2) {
+  width: 85%;
+}
+
+.skeleton-row:nth-child(3) {
+  width: 65%;
+}
+
+.skeleton-block::after,
+.skeleton-row::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  animation: shimmer 1.6s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* --- Reveal-in animation (metric cards / charts / heatmaps on new results) --- */
+@keyframes revealIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal-in {
+  animation: revealIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* --- Charts & Tables --- */
 .chart-wrapper {
   height: 600px;
@@ -1021,3 +1098,15 @@ tr:hover td {
   }
 }
 
+/* --- Reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
