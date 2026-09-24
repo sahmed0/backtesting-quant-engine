@@ -67,6 +67,10 @@ class Portfolio:
         # symbol: current_price
         self.current_prices: dict[str, float] = {}
 
+    def prime(self, event: MarketEvent) -> None:
+        """Feeds a bar from before the run starts to the sizer's estimators. No mark, no snapshot."""
+        self.sizer.update_market(event.symbol, event.close, event.high, event.low)
+
     def update_timeindex(self, event: MarketEvent) -> None:
         """
         Updates the portfolio holdings based on a new market event,

@@ -51,6 +51,14 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         # (intent / position) is inherited from Strategy and keyed by symbol.
         self.prices: deque[float] = deque(maxlen=window_size)
 
+    @property
+    def warmup_period(self) -> int:
+        return self.window_size - 1
+
+    def prime(self, event: MarketEvent) -> None:
+        if event.symbol == self.symbol and event.close > 0:
+            self.prices.append(math.log(event.close))
+
     def _calibrate_ou_parameters(self) -> tuple[float, float, float]:
         """
         Maps the OU process to an AutoRegressive AR(1) model: x_t - x_{t-1} = a + b*x_{t-1} + error

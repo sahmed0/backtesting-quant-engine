@@ -59,6 +59,15 @@ class Strategy(ABC):
         """
         pass
 
+    @property
+    def warmup_period(self) -> int:
+        """How many bars before a run's start this strategy needs to be ready on its first bar."""
+        return 0
+
+    def prime(self, event: MarketEvent) -> None:
+        """Absorbs a bar from before the run starts. Must not emit signals or touch intent."""
+        return None
+
     def on_fill(self, event: FillEvent) -> None:
         """
         Records fill-truth when an order actually fills.
@@ -111,6 +120,19 @@ class SimpleMovingAverageStrategy(Strategy):
         # Maps symbol to a deque of its most recent closing prices
         self.prices: dict[str, deque[float]] = {}
 
+    @property
+    def warmup_period(self) -> int:
+        return self.long_window - 1
+
+    def _record_close(self, symbol: str, close: float) -> None:
+        if symbol not in self.prices:
+            self.prices[symbol] = deque(maxlen=self.long_window)
+            self.intent[symbol] = None
+        self.prices[symbol].append(close)
+
+    def prime(self, event: MarketEvent) -> None:
+        self._record_close(event.symbol, event.close)
+
     def calculate_signals(self, event: MarketEvent) -> None:
         """
         Calculates and emits SMA crossover signals.
@@ -120,13 +142,7 @@ class SimpleMovingAverageStrategy(Strategy):
         next open the strategy must not re-emit the same crossover signal.
         """
         symbol = event.symbol
-        close_price = event.close
-
-        if symbol not in self.prices:
-            self.prices[symbol] = deque(maxlen=self.long_window)
-            self.intent[symbol] = None
-
-        self.prices[symbol].append(close_price)
+        self._record_close(symbol, event.close)
 
         # Wait for the warm-up period to complete
         if len(self.prices[symbol]) < self.long_window:

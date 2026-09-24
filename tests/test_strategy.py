@@ -1,6 +1,6 @@
 import unittest
 from collections import deque
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from event import (
     Event,
@@ -220,6 +220,22 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
         )
         self.assertEqual(self.short_strategy.position[self.symbol], "SHORT")
         self.assertEqual(self.short_strategy.intent[self.symbol], "SHORT")
+
+
+def test_prime_does_not_emit_or_set_intent():
+    events: deque[Event] = deque()
+    strategy = SimpleMovingAverageStrategy(events, short_window=2, long_window=4)
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    for i in range(strategy.long_window):
+        price = 100.0 + i
+        strategy.prime(
+            MarketEvent(
+                "AAPL", start + timedelta(days=i), price, price, price, price, 100
+            )
+        )
+
+    assert len(events) == 0
+    assert strategy.intent == {"AAPL": None}
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 from collections import deque
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -151,4 +151,19 @@ def test_ignores_other_symbols(base_strategy):
     base_strategy.calculate_signals(other)
 
     assert len(base_strategy.prices) == 0
+    assert len(base_strategy.events) == 0
+
+
+def test_prime_fills_window_without_signals(base_strategy):
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    for i in range(9):
+        price = 100.0 + i
+        base_strategy.prime(
+            MarketEvent(
+                "AAPL", start + timedelta(days=i), price, price, price, price, 100
+            )
+        )
+
+    assert base_strategy.warmup_period == 9
+    assert len(base_strategy.prices) == 9
     assert len(base_strategy.events) == 0
