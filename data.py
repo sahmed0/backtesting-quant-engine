@@ -9,7 +9,7 @@ from collections import deque
 from collections.abc import Iterator
 from datetime import UTC, datetime
 
-from event import Event, MarketEvent
+from event import MarketEvent
 
 # Columns every symbol CSV must provide. `open` is required because orders fill
 # at the next bar's open; a file without it cannot be simulated honestly.
@@ -49,17 +49,13 @@ class CSVDataHandler(DataHandler):
 
     def __init__(
         self,
-        events: deque[Event],
         csv_dir: str,
         symbols: list[str],
         start_date: "datetime | None" = None,
         end_date: "datetime | None" = None,
     ):
         """
-        Initialises the data handler with the event queue and symbol.
-
         Args:
-            events: The shared event queue.
             csv_dir: Directory holding one ``<symbol>.csv`` per symbol.
             symbols: The symbol to stream, as a single-element list.
             start_date: When set, bars dated before this (tz-aware, UTC) are
@@ -75,9 +71,6 @@ class CSVDataHandler(DataHandler):
         if len(symbols) != 1:
             raise ValueError("CSVDataHandler supports exactly one symbol")
 
-        # Retained for construction-signature stability across call sites; the
-        # handler no longer queues anything (update_bars returns the bar).
-        self.events = events
         self.csv_dir = csv_dir
         self.symbols = symbols
         self.start_date = start_date

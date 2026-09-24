@@ -64,7 +64,7 @@ def _fill_bar_timestamp(day: int) -> float:
 
 def test_golden_run_matches_the_hand_traced_ledger():
     events: deque[Event] = deque()
-    data_handler = CSVDataHandler(events, "tests/fixtures", ["GOLD"])
+    data_handler = CSVDataHandler("tests/fixtures", ["GOLD"])
     strategy = SimpleMovingAverageStrategy(events, short_window=2, long_window=4)
     portfolio = Portfolio(events, initial_capital=10_000.0, sizer=FixedSizer(10.0))
     execution_handler = SimulatedExecutionHandler(

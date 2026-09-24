@@ -5,10 +5,9 @@ Tests for the data handlers.
 import os
 import shutil
 import unittest
-from collections import deque
 
 from data import CSVDataHandler
-from event import Event, MarketEvent
+from event import MarketEvent
 
 
 class TestCSVDataHandler(unittest.TestCase):
@@ -27,8 +26,7 @@ class TestCSVDataHandler(unittest.TestCase):
             f.write("2023-01-01T10:00:00,149.5,151.0,149.0,150.0,1000\n")
             f.write("2023-01-01T10:01:00,150.0,151.5,150.0,150.5,1500\n")
 
-        self.events: deque[Event] = deque()
-        self.handler = CSVDataHandler(self.events, self.csv_dir, ["AAPL"])
+        self.handler = CSVDataHandler(self.csv_dir, ["AAPL"])
 
     def tearDown(self):
         """
@@ -65,9 +63,6 @@ class TestCSVDataHandler(unittest.TestCase):
         # No more data
         self.assertIsNone(self.handler.update_bars())
 
-        # The handler no longer queues anything.
-        self.assertEqual(len(self.events), 0)
-
     def test_get_latest_bar_before_first_update(self):
         """
         Before any bar has been read there is no bar to return -- None, not an
@@ -80,7 +75,7 @@ class TestCSVDataHandler(unittest.TestCase):
         The engine is single-symbol.
         """
         with self.assertRaises(ValueError) as ctx:
-            CSVDataHandler(deque(), self.csv_dir, ["AAPL", "MSFT"])
+            CSVDataHandler(self.csv_dir, ["AAPL", "MSFT"])
         self.assertIn("exactly one symbol", str(ctx.exception))
 
     def test_rejects_empty_symbol_list(self):
@@ -88,7 +83,7 @@ class TestCSVDataHandler(unittest.TestCase):
         Zero symbols is as unsupported as two.
         """
         with self.assertRaises(ValueError):
-            CSVDataHandler(deque(), self.csv_dir, [])
+            CSVDataHandler(self.csv_dir, [])
 
     def test_rejects_csv_missing_required_columns(self):
         """
@@ -101,7 +96,7 @@ class TestCSVDataHandler(unittest.TestCase):
             f.write("2023-01-01T10:00:00,151.0,149.0,150.0,1000\n")
 
         with self.assertRaises(ValueError) as ctx:
-            CSVDataHandler(deque(), self.csv_dir, ["NOOPEN"])
+            CSVDataHandler(self.csv_dir, ["NOOPEN"])
 
         message = str(ctx.exception)
         self.assertIn("NOOPEN.csv", message)

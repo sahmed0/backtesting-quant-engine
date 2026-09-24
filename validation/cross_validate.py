@@ -97,7 +97,7 @@ def run_ours(
 ) -> tuple[list[Trade], float, int]:
     """Runs the real stack and returns (trades, final_equity, dropped_orders)."""
     events: deque[Event] = deque()
-    data_handler = CSVDataHandler(events, DATA_DIR, [SYMBOL])
+    data_handler = CSVDataHandler(DATA_DIR, [SYMBOL])
     strategy = SimpleMovingAverageStrategy(
         events, short_window=SHORT_WINDOW, long_window=LONG_WINDOW
     )

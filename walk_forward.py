@@ -61,7 +61,7 @@ async def _run_async(symbol, short_w, long_w, start, end) -> Portfolio:
     """Runs one backtest over [start, end] and returns the populated portfolio."""
     events: deque[Event] = deque()
     data_handler = CSVDataHandler(
-        events, DATA_DIR, [symbol], start_date=start, end_date=end
+        DATA_DIR, [symbol], start_date=start, end_date=end
     )
     strategy = SimpleMovingAverageStrategy(
         events, short_window=short_w, long_window=long_w

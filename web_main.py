@@ -170,7 +170,7 @@ async def _grid_sharpe(
                 continue
             events: deque[Event] = deque()
             data_handler = CSVDataHandler(
-                events, "/data", [symbol], start_date=start, end_date=end
+                "/data", [symbol], start_date=start, end_date=end
             )
             strategy = SimpleMovingAverageStrategy(
                 events, short_window=short_w, long_window=long_w
@@ -434,7 +434,7 @@ async def run_backtest(event):
 
         # Initialise backtest components
         events: deque[Event] = deque()
-        data_handler = CSVDataHandler(events, "/data", [symbol])
+        data_handler = CSVDataHandler("/data", [symbol])
 
         # Select the strategy chosen in the UI
         strategy_choice = document.getElementById("strategy-select").value

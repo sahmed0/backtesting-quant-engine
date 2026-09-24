@@ -52,7 +52,7 @@ INITIAL_CAPITAL = 100_000.0
 async def _run(fill_timing: FillTiming) -> dict:
     """Runs one AAPL backtest under the given fill timing, returns its stats."""
     events: deque[Event] = deque()
-    data_handler = CSVDataHandler(events, DATA_DIR, [SYMBOL])
+    data_handler = CSVDataHandler(DATA_DIR, [SYMBOL])
     strategy = SimpleMovingAverageStrategy(
         events, short_window=SHORT_WINDOW, long_window=LONG_WINDOW
     )

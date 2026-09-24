@@ -42,7 +42,7 @@ N_RUNS = 3
 async def _timed_run() -> tuple[int, float]:
     """Runs one full AAPL backtest, returns (bars processed, elapsed seconds)."""
     events: deque[Event] = deque()
-    data_handler = CSVDataHandler(events, DATA_DIR, [SYMBOL])
+    data_handler = CSVDataHandler(DATA_DIR, [SYMBOL])
     strategy = SimpleMovingAverageStrategy(
         events, short_window=SHORT_WINDOW, long_window=LONG_WINDOW
     )
