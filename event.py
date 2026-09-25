@@ -110,10 +110,6 @@ class OrderFailedEvent:
     reason: FailReason
 
 
-# Every event that can travel through the engine's queue. The engine dispatches
-# on the concrete type, so this union is exhaustive by construction.
-#
-# MarketEvent is a member for historical reasons only: the data handler now
-# returns bars directly to the engine rather than queueing them, so a
-# MarketEvent reaching the queue is a bug (the engine's _drain raises on one).
-Event = MarketEvent | SignalEvent | OrderEvent | FillEvent | OrderFailedEvent
+# Every event that can travel through the engine's queue. Market data is not one
+# of them: the data handler returns each bar to the engine directly.
+Event = SignalEvent | OrderEvent | FillEvent | OrderFailedEvent

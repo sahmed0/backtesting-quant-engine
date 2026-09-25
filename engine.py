@@ -2,12 +2,12 @@ import asyncio
 import logging
 from collections import deque
 from collections.abc import Callable
+from typing import assert_never
 
 from data import DataHandler
 from event import (
     Event,
     FillEvent,
-    MarketEvent,
     OrderEvent,
     OrderFailedEvent,
     SignalEvent,
@@ -120,10 +120,5 @@ class Backtest:
                         f"{event.quantity} {event.symbol} (reason: {event.reason})"
                     )
                     self.strategy.on_order_failed(event)
-                case MarketEvent():
-                    # Market data reaches the engine as update_bars()'s return
-                    # value, never through the queue. One arriving here means a
-                    # producer regressed to queueing bars.
-                    raise RuntimeError(
-                        "MarketEvent must not be queued; update_bars() returns it"
-                    )
+                case _:
+                    assert_never(event)

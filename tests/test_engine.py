@@ -153,15 +153,6 @@ def test_progress_callback_reports_bars(bars):
     assert seen == [2, 4]
 
 
-def test_queued_market_event_is_rejected(bars):
-    """Bars reach the engine as a return value; queueing one is a bug."""
-    backtest, _, _, _ = _build(bars, signal_on=1)
-    backtest.events.append(bars[0])
-
-    with pytest.raises(RuntimeError, match="MarketEvent must not be queued"):
-        asyncio.run(backtest.run())
-
-
 def test_queue_is_fully_drained_at_end_of_run(bars):
     """
     SIGNAL -> ORDER -> FILL is walked within a drain, including the final drain
