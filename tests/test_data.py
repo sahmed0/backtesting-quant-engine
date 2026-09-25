@@ -5,6 +5,9 @@ Tests for the data handlers.
 import os
 import shutil
 import unittest
+from datetime import UTC, datetime, timedelta
+
+import pytest
 
 from data import CSVDataHandler
 from event import MarketEvent
@@ -101,6 +104,73 @@ class TestCSVDataHandler(unittest.TestCase):
         message = str(ctx.exception)
         self.assertIn("NOOPEN.csv", message)
         self.assertIn("open", message)
+
+
+DAY0 = datetime(2024, 1, 1, tzinfo=UTC)
+
+
+def _write_daily_csv(directory, n_rows: int) -> list[datetime]:
+    """Writes n_rows daily bars for TEST, with close = 100 + row index."""
+    stamps = [DAY0 + timedelta(days=i) for i in range(n_rows)]
+    with open(os.path.join(directory, "TEST.csv"), "w") as f:
+        f.write("timestamp,open,high,low,close,volume\n")
+        for i, ts in enumerate(stamps):
+            c = 100.0 + i
+            f.write(f"{ts.replace(tzinfo=None).isoformat()},{c},{c},{c},{c},1000\n")
+    return stamps
+
+
+def test_warmup_returns_bars_just_before_start(tmp_path):
+    stamps = _write_daily_csv(tmp_path, 6)
+    handler = CSVDataHandler(str(tmp_path), ["TEST"], start_date=stamps[4], warmup=2)
+
+    assert [b.timestamp for b in handler.warmup_bars()] == [stamps[2], stamps[3]]
+    first = handler.update_bars()
+    assert first is not None
+    assert first.timestamp == stamps[4]
+
+
+def test_warmup_is_capped_by_available_history(tmp_path):
+    stamps = _write_daily_csv(tmp_path, 6)
+    handler = CSVDataHandler(str(tmp_path), ["TEST"], start_date=stamps[1], warmup=5)
+
+    assert [b.timestamp for b in handler.warmup_bars()] == [stamps[0]]
+
+
+def test_warmup_zero_returns_nothing(tmp_path):
+    stamps = _write_daily_csv(tmp_path, 6)
+    handler = CSVDataHandler(str(tmp_path), ["TEST"], start_date=stamps[3], warmup=0)
+
+    assert handler.warmup_bars() == []
+    first = handler.update_bars()
+    assert first is not None
+    assert first.timestamp == stamps[3]
+
+
+def test_update_bars_skips_pre_start_bars_without_warmup_call(tmp_path):
+    stamps = _write_daily_csv(tmp_path, 6)
+    handler = CSVDataHandler(str(tmp_path), ["TEST"], start_date=stamps[3], warmup=2)
+
+    bars = []
+    while (bar := handler.update_bars()) is not None:
+        bars.append(bar.timestamp)
+    assert bars == stamps[3:]
+
+
+def test_warmup_bars_is_stable(tmp_path):
+    stamps = _write_daily_csv(tmp_path, 6)
+    handler = CSVDataHandler(str(tmp_path), ["TEST"], start_date=stamps[3], warmup=2)
+
+    before = handler.warmup_bars()
+    assert handler.get_latest_bar("TEST") is None
+    handler.update_bars()
+    assert handler.warmup_bars() == before
+
+
+def test_negative_warmup_rejected(tmp_path):
+    _write_daily_csv(tmp_path, 6)
+    with pytest.raises(ValueError, match="warmup must be >= 0"):
+        CSVDataHandler(str(tmp_path), ["TEST"], warmup=-1)
 
 
 if __name__ == "__main__":

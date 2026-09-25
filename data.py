@@ -38,6 +38,13 @@ class DataHandler(ABC):
         """
         pass
 
+    def warmup_bars(self) -> list[MarketEvent]:
+        """
+        Bars from before the run's start date, oldest first, for strategies and
+        sizers to read. The engine never trades or marks them. None by default.
+        """
+        return []
+
 
 class CSVDataHandler(DataHandler):
     """
@@ -51,33 +58,38 @@ class CSVDataHandler(DataHandler):
         self,
         csv_dir: str,
         symbols: list[str],
-        start_date: "datetime | None" = None,
-        end_date: "datetime | None" = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        warmup: int = 0,
     ):
         """
         Args:
             csv_dir: Directory holding one ``<symbol>.csv`` per symbol.
             symbols: The symbol to stream, as a single-element list.
-            start_date: When set, bars dated before this (tz-aware, UTC) are
-                skipped. Used to restrict a run to an in-sample or out-of-sample
-                window without copying the underlying CSV.
-            end_date: When set, bars dated after this are skipped. The bound is
-                inclusive on both ends.
+            start_date: First bar of the run (tz-aware, UTC). Inclusive.
+            end_date: Last bar of the run. Inclusive.
+            warmup: Most bars before ``start_date`` to return from
+                ``warmup_bars()``.
 
         Raises:
-            ValueError: If more or fewer than one symbol is given, or if a CSV
-                is missing required columns.
+            ValueError: If more or fewer than one symbol is given, if a CSV is
+                missing required columns, or if ``warmup`` is negative.
         """
         if len(symbols) != 1:
             raise ValueError("CSVDataHandler supports exactly one symbol")
+        if warmup < 0:
+            raise ValueError("warmup must be >= 0")
 
         self.csv_dir = csv_dir
         self.symbols = symbols
         self.start_date = start_date
         self.end_date = end_date
+        self.warmup = warmup
 
         self.symbol_data: dict[str, Iterator[MarketEvent]] = {}
         self.latest_symbol_data: dict[str, MarketEvent | None] = {}
+        self._warmup: list[MarketEvent] | None = None
+        self._first_live: MarketEvent | None = None
 
         self._load_data()
 
@@ -99,9 +111,6 @@ class CSVDataHandler(DataHandler):
                             tzinfo=UTC
                         )
 
-                        # Apply the optional in-/out-of-sample date filter.
-                        if self.start_date is not None and timestamp < self.start_date:
-                            continue
                         if self.end_date is not None and timestamp > self.end_date:
                             continue
 
@@ -141,6 +150,27 @@ class CSVDataHandler(DataHandler):
         """
         return self.latest_symbol_data.get(symbol)
 
+    def _advance_to_start(self) -> None:
+        """Reads up to the first bar on or after start_date, keeping the last `warmup` bars before it."""
+        stream = self.symbol_data[self.symbols[0]]
+        buffer: deque[MarketEvent] = deque(maxlen=self.warmup)
+        for bar in stream:
+            if self.start_date is None or bar.timestamp >= self.start_date:
+                self._first_live = bar
+                break
+            buffer.append(bar)
+        self._warmup = list(buffer)
+
+    def warmup_bars(self) -> list[MarketEvent]:
+        """
+        Returns up to ``warmup`` bars from just before ``start_date``, oldest
+        first. Repeat calls return the same bars.
+        """
+        if self._warmup is None:
+            self._advance_to_start()
+        assert self._warmup is not None
+        return list(self._warmup)
+
     def update_bars(self) -> MarketEvent | None:
         """
         Advances to the next bar and returns it, or None once the CSV is
@@ -151,11 +181,18 @@ class CSVDataHandler(DataHandler):
         ordering (fills, then mark-to-market, then signals) that the engine
         drives directly.
         """
+        if self._warmup is None:
+            self._advance_to_start()
+
         symbol = self.symbols[0]
-        try:
-            bar = next(self.symbol_data[symbol])
-        except StopIteration:
-            return None
+        if self._first_live is not None:
+            bar = self._first_live
+            self._first_live = None
+        else:
+            try:
+                bar = next(self.symbol_data[symbol])
+            except StopIteration:
+                return None
 
         self.latest_symbol_data[symbol] = bar
         return bar

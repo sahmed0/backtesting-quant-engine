@@ -33,16 +33,7 @@ class Backtest:
         execution_handler: ExecutionHandler,
         events: deque[Event],
     ):
-        """
-        Initialises the backtest.
-
-        Args:
-            data_handler: The MarketDataHandler instance.
-            strategy: The Strategy object.
-            portfolio: The Portfolio object.
-            execution_handler: The ExecutionHandler object.
-            events: The Event Queue object.
-        """
+        """Wires the components of one backtest together."""
         self.data_handler = data_handler
         self.strategy = strategy
         self.portfolio = portfolio
@@ -56,6 +47,9 @@ class Backtest:
     ) -> None:
         """
         Executes the backtest logic.
+
+        Warm-up bars are fed to the portfolio's sizer and the strategy first,
+        and are never traded or marked.
 
         The per-bar sequence is load-bearing and must not be reordered:
 
@@ -73,6 +67,10 @@ class Backtest:
                 loop. The engine is CPU-bound, so without this the browser tab
                 would freeze for the whole run.
         """
+        for bar in self.data_handler.warmup_bars():
+            self.portfolio.prime(bar)
+            self.strategy.prime(bar)
+
         bars = 0
         while True:
             market = self.data_handler.update_bars()
