@@ -30,11 +30,18 @@ import sys
 from collections import deque
 from datetime import UTC, datetime
 
+import numpy as np
+
 import performance
 from data import CSVDataHandler
 from engine import Backtest
 from event import Event
-from execution import SimulatedExecutionHandler
+from execution import (
+    DEFAULT_COMMISSION_PER_SHARE,
+    DEFAULT_MIN_COMMISSION,
+    DEFAULT_SLIPPAGE_PCT,
+    SimulatedExecutionHandler,
+)
 from portfolio import Portfolio
 from position_sizing import PercentEquitySizer
 from strategy import SimpleMovingAverageStrategy
@@ -48,34 +55,57 @@ IS_FRACTION = 0.70
 
 DATA_DIR = "data"
 INITIAL_CAPITAL = 100000.0
+SIZING_FRACTION = 0.1
+
+# The first bar any run may trade, so every run has its full lookback.
+WARMUP_START = max(LONG_WINDOWS) - 1
 
 
-def read_timestamps(csv_path: str) -> list[datetime]:
-    """Reads the (tz-aware, UTC) timestamp of every bar, in file order."""
+def read_bars_meta(csv_path: str) -> tuple[list[datetime], np.ndarray]:
+    """Reads the (tz-aware, UTC) timestamp and the close of every bar, in file order."""
     timestamps: list[datetime] = []
+    closes: list[float] = []
     with open(csv_path, encoding="utf-8") as f:
         for row in csv.DictReader(f):
             timestamps.append(
                 datetime.fromisoformat(row["timestamp"]).replace(tzinfo=UTC)
             )
-    return timestamps
+            closes.append(float(row["close"]))
+    return timestamps, np.array(closes, dtype=float)
 
 
-def split_dates(timestamps: list[datetime], fraction: float):
+def split_dates(
+    timestamps: list[datetime], fraction: float
+) -> tuple[datetime, datetime, datetime, datetime]:
     """
     Splits the timeline so the first ``fraction`` of bars is in-sample and the
-    remainder is out-of-sample, with no overlapping bar between the two.
+    remainder is out-of-sample, with no overlapping bar between the two. The
+    in-sample period starts at WARMUP_START, so every grid cell trades over the
+    same bars.
 
     Returns (is_start, is_end, oos_start, oos_end).
     """
     split_idx = int(len(timestamps) * fraction)
-    is_start, is_end = timestamps[0], timestamps[split_idx - 1]
+    if split_idx - WARMUP_START < 2 * max(LONG_WINDOWS):
+        raise ValueError("Not enough data to form an in-/out-of-sample split.")
+    is_start, is_end = timestamps[WARMUP_START], timestamps[split_idx - 1]
     oos_start, oos_end = timestamps[split_idx], timestamps[-1]
     return is_start, is_end, oos_start, oos_end
 
 
-async def _run_async(symbol, short_w, long_w, start, end) -> dict:
-    """Runs a single backtest over [start, end] and returns its summary stats."""
+def cost_line() -> str:
+    """The sizing and cost assumptions every run in these scripts uses."""
+    return (
+        f"Sizing: {SIZING_FRACTION:.0%} of equity per entry. "
+        f"Costs: {DEFAULT_SLIPPAGE_PCT * 1e4:.1f} bps slippage, "
+        f"${DEFAULT_COMMISSION_PER_SHARE:.3f}/share commission "
+        f"(${DEFAULT_MIN_COMMISSION:.2f} minimum)."
+    )
+
+
+async def _run_sma_async(
+    symbol: str, short_w: int, long_w: int, start: datetime, end: datetime
+) -> Portfolio:
     events: deque[Event] = deque()
     strategy = SimpleMovingAverageStrategy(
         events, short_window=short_w, long_window=long_w
@@ -88,17 +118,33 @@ async def _run_async(symbol, short_w, long_w, start, end) -> dict:
         warmup=strategy.warmup_period,
     )
     portfolio = Portfolio(
-        events, initial_capital=INITIAL_CAPITAL, sizer=PercentEquitySizer(fraction=0.1)
+        events,
+        initial_capital=INITIAL_CAPITAL,
+        sizer=PercentEquitySizer(fraction=SIZING_FRACTION),
     )
     execution = SimulatedExecutionHandler(events, data_handler, portfolio)
     backtest = Backtest(data_handler, strategy, portfolio, execution, events)
     await backtest.run()
-    return performance.create_summary_stats(portfolio)
+    return portfolio
 
 
-def run_once(symbol, short_w, long_w, start, end) -> dict:
-    """Synchronous wrapper around a single backtest run."""
-    return asyncio.run(_run_async(symbol, short_w, long_w, start, end))
+def run_sma(
+    symbol: str, short_w: int, long_w: int, start: datetime, end: datetime
+) -> Portfolio:
+    """
+    Runs SMA(short_w, long_w) over [start, end], primed with the bars just
+    before start, and returns the populated portfolio.
+    """
+    return asyncio.run(_run_sma_async(symbol, short_w, long_w, start, end))
+
+
+def run_once(
+    symbol: str, short_w: int, long_w: int, start: datetime, end: datetime
+) -> dict:
+    """Runs one warmed backtest over [start, end] and returns its summary stats."""
+    return performance.create_summary_stats(
+        run_sma(symbol, short_w, long_w, start, end)
+    )
 
 
 def param_grid():
@@ -147,22 +193,24 @@ def main():
         print(f"Error: data file not found at {csv_path}")
         sys.exit(1)
 
-    timestamps = read_timestamps(csv_path)
+    timestamps, _ = read_bars_meta(csv_path)
     is_start, is_end, oos_start, oos_end = split_dates(timestamps, IS_FRACTION)
+    split_idx = int(len(timestamps) * IS_FRACTION)
 
     def d(dt: datetime) -> str:
         return dt.date().isoformat()
 
     print("=" * 72)
-    print(f"Curve over-fitting demonstration  --  {symbol}")
+    print(f"Curve over-fitting demonstration  -  {symbol}")
     print("=" * 72)
+    print(cost_line())
     print(
         f"In-sample (optimise here):  {d(is_start)} -> {d(is_end)}  "
-        f"({int(len(timestamps) * IS_FRACTION)} bars)"
+        f"({split_idx - WARMUP_START} bars)"
     )
     print(
         f"Out-of-sample (held out):   {d(oos_start)} -> {d(oos_end)}  "
-        f"({len(timestamps) - int(len(timestamps) * IS_FRACTION)} bars)"
+        f"({len(timestamps) - split_idx} bars)"
     )
     print()
 
@@ -204,15 +252,11 @@ def main():
         oos_sharpe = oos_for_is_best["sharpe_ratio"]
         is_ret = best_is_stats["total_return"]
         oos_ret = oos_for_is_best["total_return"]
-        # Walk-forward efficiency: how much of the IS edge survived out of
-        # sample. ~1.0 is robust; near 0 or negative means the edge was noise.
-        wfe = (oos_ret / is_ret) if is_ret != 0 else float("nan")
         print()
         print(f"  Sharpe degradation:        {is_sharpe:.2f} -> {oos_sharpe:.2f}")
         print(
             f"  Return degradation:        {is_ret * 100:.2f}% -> {oos_ret * 100:.2f}%"
         )
-        print(f"  Walk-forward efficiency:   {wfe:.2f}  (OOS return / IS return)")
     else:
         print("  Out-of-sample:  (no usable result for these parameters)")
     print()

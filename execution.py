@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 FillTiming = Literal["next_open", "same_close"]
 
+DEFAULT_COMMISSION_PER_SHARE = 0.005
+DEFAULT_MIN_COMMISSION = 1.00
+DEFAULT_SLIPPAGE_PCT = 0.0005
+
 
 class ExecutionHandler(ABC):
     """
@@ -72,9 +76,9 @@ class SimulatedExecutionHandler(ExecutionHandler):
         events: deque[Event],
         data_handler: DataHandler,
         portfolio: Portfolio,
-        commission_per_share: float = 0.005,
-        min_commission: float = 1.00,
-        slippage_pct: float = 0.0005,
+        commission_per_share: float = DEFAULT_COMMISSION_PER_SHARE,
+        min_commission: float = DEFAULT_MIN_COMMISSION,
+        slippage_pct: float = DEFAULT_SLIPPAGE_PCT,
         fill_timing: FillTiming = "next_open",
     ):
         """
