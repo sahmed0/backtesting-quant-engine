@@ -12,6 +12,7 @@ from walk_forward import (
     buy_and_hold_stats,
     efficiency,
     make_folds,
+    parse_args,
 )
 
 
@@ -57,6 +58,11 @@ def test_efficiency_nan_when_no_usable_folds():
     median, used, total = efficiency([make_fold(-0.1, 0.1), make_fold(0.2, 0.1, False)])
     assert math.isnan(median)
     assert (used, total) == (0, 2)
+
+
+def test_parse_args_rejects_zero_alignments():
+    with pytest.raises(SystemExit):
+        parse_args(["AAPL", "--alignments", "0"])
 
 
 def test_buy_and_hold_uses_only_fold_bars():

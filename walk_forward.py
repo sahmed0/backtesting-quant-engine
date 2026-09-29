@@ -22,6 +22,7 @@ once. The script contrasts that stitched walk-forward result against the naive
 its window to fill its indicators.
 
 Run:  python walk_forward.py [SYMBOL]   (default SYMBOL: AAPL)
+      python walk_forward.py AAPL --alignments 5   (fold-alignment sensitivity)
 """
 
 import argparse
@@ -205,7 +206,17 @@ def efficiency(folds: list[FoldResult]) -> tuple[float, int, int]:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Rolling walk-forward analysis.")
     parser.add_argument("symbol", nargs="?", default="AAPL")
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--alignments",
+        type=int,
+        default=1,
+        help="rerun at N fold offsets within one OOS window and report the "
+        "spread of the stitched Sharpe",
+    )
+    args = parser.parse_args(argv)
+    if args.alignments < 1:
+        parser.error("--alignments must be at least 1")
+    return args
 
 
 def _fmt_curve(sharpe: float, total_return: float, max_dd: float) -> str:
@@ -354,6 +365,27 @@ def main() -> None:
         )
         print(f"  SMA({ns},{nl})   {_fmt_stats(naive_stats)}")
     print("=" * 78)
+
+    if args.alignments > 1:
+        n = args.alignments
+        runs = [result]
+        for k in range(1, n):
+            offset = FOLD_OFFSET + round(k * OOS_WINDOW / n)
+            print(f"alignment {k + 1}/{n} ...", file=sys.stderr, flush=True)
+            runs.append(run_walk_forward(symbol, timestamps, offset))
+
+        sharpes = [stitched_stats(r, ppy)[0] for r in runs]
+        print()
+        print(f"Fold-alignment sensitivity ({n} alignments):")
+        for r, sharpe in zip(runs, sharpes, strict=True):
+            print(
+                f"  first IS bar {r.offset:>3}   folds {len(r.folds):>2}   "
+                f"stitched Sharpe {sharpe:.2f}"
+            )
+        print(
+            f"  min / median / max stitched Sharpe: {min(sharpes):.2f} / "
+            f"{float(np.median(sharpes)):.2f} / {max(sharpes):.2f}"
+        )
 
 
 if __name__ == "__main__":
