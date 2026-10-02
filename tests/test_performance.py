@@ -20,8 +20,11 @@ from performance import (
     completed_round_trips,
     create_summary_stats,
     deflated_sharpe_ratio,
+    deflated_sharpe_report,
+    effective_number_of_trials,
     expected_max_sharpe,
     infer_periods_per_year,
+    mean_pairwise_correlation,
     normal_cdf,
     normal_ppf,
     returns_moments,
@@ -399,14 +402,13 @@ def test_deflated_sharpe_pure_noise_is_not_significant():
     # edge the DSR must not clear a confident threshold.
     rng = np.random.default_rng(7)
     n_trials = 20
-    per_period_sharpes = []
     n_obs = 500
-    for _ in range(n_trials):
-        r = rng.normal(0.0, 0.01, size=n_obs)
-        per_period_sharpes.append(float(np.mean(r) / np.std(r, ddof=1)))
-    sr_observed = max(per_period_sharpes)
+    streams = [rng.normal(0.0, 0.01, size=n_obs) for _ in range(n_trials)]
+    per_period_sharpes = [float(np.mean(r) / np.std(r, ddof=1)) for r in streams]
+    best = int(np.argmax(per_period_sharpes))
+    sr_observed = per_period_sharpes[best]
     sr_variance = float(np.var(per_period_sharpes, ddof=1))
-    skew, kurt = returns_moments(rng.normal(0.0, 0.01, size=n_obs))
+    skew, kurt = returns_moments(streams[best])
     dsr = deflated_sharpe_ratio(sr_observed, sr_variance, n_trials, n_obs, skew, kurt)
     assert dsr < 0.9
 
@@ -434,6 +436,65 @@ def test_returns_moments_normal_reference():
 def test_returns_moments_degenerate_cases():
     assert returns_moments(np.array([0.01])) == (0.0, 3.0)  # n < 2
     assert returns_moments(np.array([0.01, 0.01, 0.01])) == (0.0, 3.0)  # sigma 0
+
+
+def test_effective_trials_identical_rows_is_one():
+    r = np.random.default_rng(5).normal(0.0, 0.01, size=300)
+    assert effective_number_of_trials(np.vstack([r] * 5)) == pytest.approx(
+        1.0, abs=1e-9
+    )
+
+
+def test_effective_trials_independent_rows_near_n():
+    rng = np.random.default_rng(3)
+    assert effective_number_of_trials(rng.normal(size=(10, 5000))) >= 9.5
+
+
+def test_effective_trials_rejects_constant_row():
+    rows = np.vstack([np.random.default_rng(4).normal(size=100), np.zeros(100)])
+    with pytest.raises(ValueError):
+        effective_number_of_trials(rows)
+
+
+def test_mean_pairwise_correlation_identical_rows_is_one():
+    r = np.random.default_rng(6).normal(0.0, 0.01, size=300)
+    assert mean_pairwise_correlation(np.vstack([r] * 4)) == pytest.approx(1.0)
+
+
+def test_deflated_sharpe_report_matches_direct_computation():
+    rng = np.random.default_rng(8)
+    trials = [rng.normal(0.0002 * k, 0.01, size=500) for k in range(6)]
+    sharpes = [float(np.mean(t) / np.std(t, ddof=1)) for t in trials]
+    chosen = int(np.argmax(sharpes))
+
+    report = deflated_sharpe_report(trials, chosen)
+
+    skew, kurt = returns_moments(trials[chosen])
+    expected = deflated_sharpe_ratio(
+        sharpes[chosen], float(np.var(sharpes, ddof=1)), 6, 500, skew, kurt
+    )
+    assert report.dsr == pytest.approx(expected, rel=1e-12)
+    assert report.n_eff <= 6
+
+
+def test_dsr_eff_not_below_dsr_when_trials_correlated():
+    rng = np.random.default_rng(9)
+    base = rng.normal(0.0005, 0.01, size=1000)
+    trials = [base + rng.normal(0.0, 0.002, size=1000) for _ in range(8)]
+    sharpes = [float(np.mean(t) / np.std(t, ddof=1)) for t in trials]
+
+    report = deflated_sharpe_report(trials, int(np.argmax(sharpes)))
+
+    assert report.mean_correlation > 0.9
+    assert report.n_eff < report.n_trials
+    assert report.dsr_eff >= report.dsr
+
+
+def test_deflated_sharpe_report_rejects_mismatched_lengths():
+    rng = np.random.default_rng(10)
+    trials = [rng.normal(size=100), rng.normal(size=99)]
+    with pytest.raises(ValueError):
+        deflated_sharpe_report(trials, 0)
 
 
 def test_sharpe_ci_is_deterministic_for_a_seed():

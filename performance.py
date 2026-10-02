@@ -5,6 +5,8 @@ Performance metrics and summary statistics for trading portfolios.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -338,7 +340,7 @@ def normal_ppf(p: float) -> float:
     return 0.5 * (lo + hi)
 
 
-def expected_max_sharpe(sr_variance: float, n_trials: int) -> float:
+def expected_max_sharpe(sr_variance: float, n_trials: float) -> float:
     """
     Expected maximum of ``n_trials`` iid Sharpe estimates whose variance is
     ``sr_variance`` (Bailey & Lopez de Prado 2014, Appendix D)::
@@ -346,8 +348,9 @@ def expected_max_sharpe(sr_variance: float, n_trials: int) -> float:
         SR0 = sqrt(V) * [(1 - gamma) * Phi^-1(1 - 1/N)
                          + gamma * Phi^-1(1 - 1/(N*e))]
 
-    with gamma the Euler-Mascheroni constant. Returns 0.0 when there are fewer
-    than two trials or the variance is non-positive.
+    with gamma the Euler-Mascheroni constant. ``n_trials`` may be fractional (an
+    effective number of trials). Returns 0.0 when there are fewer than two trials
+    or the variance is non-positive, so below two trials no deflation is applied.
     """
     if n_trials < 2 or sr_variance <= 0.0:
         return 0.0
@@ -363,7 +366,7 @@ def expected_max_sharpe(sr_variance: float, n_trials: int) -> float:
 def deflated_sharpe_ratio(
     sr_observed: float,
     sr_variance: float,
-    n_trials: int,
+    n_trials: float,
     n_obs: int,
     skew: float,
     kurt: float,
@@ -412,6 +415,95 @@ def returns_moments(returns: np.ndarray) -> tuple[float, float]:
     skew = float(np.mean(centered**3) / sigma**3)
     kurt = float(np.mean(centered**4) / sigma**4)
     return skew, kurt
+
+
+def effective_number_of_trials(trial_returns: np.ndarray) -> float:
+    """
+    Effective number of independent trials among correlated ones, from the
+    eigenvalues of their return correlation matrix (Nyholt 2004)::
+
+        N_eff = 1 + (N - 1) * (1 - Var(eigenvalues) / N)
+
+    with Var the sample variance (ddof=1). Rows are trials, columns are the
+    same bars. Returns a value in [1, N].
+    """
+    r = np.asarray(trial_returns, dtype=float)
+    if r.ndim != 2:
+        raise ValueError("trial_returns must be a 2-D array (trials x bars)")
+    n = r.shape[0]
+    if n < 2:
+        return float(n)
+    if np.any(np.std(r, axis=1) == 0.0):
+        raise ValueError("every trial needs returns with non-zero std")
+
+    eig = np.linalg.eigvalsh(np.corrcoef(r))
+    n_eff = 1.0 + (n - 1) * (1.0 - float(np.var(eig, ddof=1)) / n)
+    return min(max(n_eff, 1.0), float(n))
+
+
+def mean_pairwise_correlation(trial_returns: np.ndarray) -> float:
+    """Mean correlation over every pair of trials (rows). 1.0 below two trials."""
+    r = np.asarray(trial_returns, dtype=float)
+    n = r.shape[0]
+    if n < 2:
+        return 1.0
+    corr = np.corrcoef(r)
+    return float(np.mean(corr[np.triu_indices(n, k=1)]))
+
+
+@dataclass(frozen=True)
+class DeflatedSharpeReport:
+    n_trials: int
+    n_eff: float
+    mean_correlation: float
+    sr_period: float  # per-period Sharpe of the chosen trial
+    n_obs: int
+    skew: float
+    kurt: float
+    dsr: float  # deflated using n_trials
+    dsr_eff: float  # deflated using n_eff
+
+
+def deflated_sharpe_report(
+    trial_returns: Sequence[np.ndarray], chosen: int
+) -> DeflatedSharpeReport:
+    """
+    Deflated Sharpe of trial ``chosen`` among ``trial_returns`` (per-bar returns
+    of every trial over the same bars), counting both every trial and the
+    effective number of independent trials.
+    """
+    n_trials = len(trial_returns)
+    if n_trials < 2:
+        raise ValueError("need at least two trials")
+    if not 0 <= chosen < n_trials:
+        raise ValueError("chosen trial index out of range")
+    rows = [np.asarray(t, dtype=float) for t in trial_returns]
+    n_obs = len(rows[0])
+    if any(len(t) != n_obs for t in rows):
+        raise ValueError("every trial must cover the same bars")
+    if n_obs < 2:
+        raise ValueError("every trial needs at least two returns")
+    matrix = np.vstack(rows)
+    stds = np.std(matrix, axis=1, ddof=1)
+    if np.any(stds == 0.0):
+        raise ValueError("every trial needs returns with non-zero std")
+
+    sharpes = np.mean(matrix, axis=1) / stds
+    sr_variance = float(np.var(sharpes, ddof=1))
+    sr = float(sharpes[chosen])
+    skew, kurt = returns_moments(matrix[chosen])
+    n_eff = effective_number_of_trials(matrix)
+    return DeflatedSharpeReport(
+        n_trials=n_trials,
+        n_eff=n_eff,
+        mean_correlation=mean_pairwise_correlation(matrix),
+        sr_period=sr,
+        n_obs=n_obs,
+        skew=skew,
+        kurt=kurt,
+        dsr=deflated_sharpe_ratio(sr, sr_variance, n_trials, n_obs, skew, kurt),
+        dsr_eff=deflated_sharpe_ratio(sr, sr_variance, n_eff, n_obs, skew, kurt),
+    )
 
 
 def bootstrap_sharpe_samples(
