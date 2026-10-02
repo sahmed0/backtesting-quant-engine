@@ -158,14 +158,21 @@ def evaluate_grid(symbol, start, end) -> dict:
     """
     Runs every parameter pair over [start, end].
 
-    Returns {(short, long): stats}. Combinations that produce no usable equity
-    curve (e.g. the long window never warms up on a short slice) are skipped.
+    Returns {(short, long): (stats, returns)}, with ``returns`` the run's per-bar
+    equity returns. Combinations that produce no usable equity curve (e.g. the
+    long window never warms up on a short slice) or flat returns are skipped.
     """
     results = {}
     for short_w, long_w in param_grid():
-        stats = run_once(symbol, short_w, long_w, start, end)
-        if "error" not in stats:
-            results[(short_w, long_w)] = stats
+        portfolio = run_sma(symbol, short_w, long_w, start, end)
+        stats = performance.create_summary_stats(portfolio)
+        if "error" in stats:
+            continue
+        equity = portfolio.generate_equity_curve()["total"]
+        returns = equity.pct_change().dropna().to_numpy()
+        if len(returns) < 2 or np.std(returns) == 0.0:
+            continue
+        results[(short_w, long_w)] = (stats, returns)
     return results
 
 
@@ -221,7 +228,9 @@ def main():
         sys.exit(1)
 
     is_ranked = sorted(
-        is_results.items(), key=lambda kv: kv[1]["sharpe_ratio"], reverse=True
+        ((params, stats) for params, (stats, _) in is_results.items()),
+        key=lambda kv: kv[1]["sharpe_ratio"],
+        reverse=True,
     )
 
     print("In-sample grid search, ranked by Sharpe (top 5):")
@@ -237,7 +246,7 @@ def main():
     oos_results = evaluate_grid(symbol, oos_start, oos_end)
 
     # The IS winner, now run on data it never saw.
-    oos_for_is_best = oos_results.get(best_params)
+    oos_for_is_best = oos_results.get(best_params, (None, None))[0]
 
     print("=" * 72)
     print("The over-fitting tax")
@@ -264,7 +273,9 @@ def main():
     # --- 3. Hindsight: would the IS winner have won out of sample? --------
     if oos_results:
         oos_ranked = sorted(
-            oos_results.items(), key=lambda kv: kv[1]["sharpe_ratio"], reverse=True
+            ((params, stats) for params, (stats, _) in oos_results.items()),
+            key=lambda kv: kv[1]["sharpe_ratio"],
+            reverse=True,
         )
         oos_order = [params for params, _ in oos_ranked]
         rank = oos_order.index(best_params) + 1 if best_params in oos_order else None
@@ -288,6 +299,32 @@ def main():
         print("  out of sample too. The further down it sits, the more the")
         print("  optimisation fit noise rather than a repeatable edge.")
     print("=" * 72)
+
+    # --- 4. Deflated Sharpe of the in-sample pick -------------------------
+    trial_params = list(is_results)
+    if len(trial_params) >= 2:
+        report = performance.deflated_sharpe_report(
+            [is_results[params][1] for params in trial_params],
+            trial_params.index(best_params),
+        )
+        print()
+        print("=" * 72)
+        print(f"Deflated Sharpe Ratio of the in-sample pick SMA({short_w},{long_w})")
+        print("=" * 72)
+        print(f"  Settings tried:                         {report.n_trials}")
+        print(
+            f"  Average correlation of their returns:   {report.mean_correlation:.2f}"
+        )
+        print(f"  Effective number of independent tries:  {report.n_eff:.1f}")
+        dsr_n = f"DSR counting {report.n_trials} tries:"
+        dsr_eff = f"DSR counting {report.n_eff:.1f} tries:"
+        print(f"  {dsr_n:<40}{report.dsr:.3f}")
+        print(f"  {dsr_eff:<40}{report.dsr_eff:.3f}")
+        print(
+            f"  (per-period Sharpe {report.sr_period:.4f} over {report.n_obs} bars, "
+            f"skew {report.skew:.2f}, kurtosis {report.kurt:.1f})"
+        )
+        print("=" * 72)
 
 
 if __name__ == "__main__":
