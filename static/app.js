@@ -584,14 +584,17 @@ window.updateHeatmaps = function (payloadJSON) {
       : `The bright in-sample spike does not survive: that collapse, and the ` +
         `fact the winning cell moves, is curve over-fitting made visible.`);
 
-  if (p.dsr !== undefined && p.dsr !== null) {
-    const dsrClass = p.dsr >= 0.95 ? 'dsr-good' : 'dsr-bad';
+  if (p.dsr !== null && p.dsr !== undefined) {
+    const cls = v => (v >= 0.95 ? 'dsr-good' : 'dsr-bad');
     document.getElementById('of-verdict').innerHTML +=
-      ` After accounting for having tried <strong>${p.dsr_n_trials}</strong> ` +
-      `configurations, the Deflated Sharpe Ratio of the in-sample pick is ` +
-      `<span class="${dsrClass}">${p.dsr.toFixed(2)}</span> - the probability ` +
-      `its edge is real rather than selection luck. Below 0.95, treat it as ` +
-      `indistinguishable from noise.`;
+      ` The in-sample pick was chosen from <strong>${p.dsr_n_trials}</strong> settings. ` +
+      `Its Deflated Sharpe Ratio is <span class="${cls(p.dsr)}">${p.dsr.toFixed(3)}</span> ` +
+      `counting all ${p.dsr_n_trials} as separate tries, and ` +
+      `<span class="${cls(p.dsr_eff)}">${p.dsr_eff.toFixed(3)}</span> counting them as about ` +
+      `${p.n_eff.toFixed(1)} independent tries (their returns have an average correlation of ` +
+      `${p.mean_corr.toFixed(2)}). That is the probability the in-sample Sharpe is not just the ` +
+      `luckiest of the tries; below 0.95, treat it as noise. It does not say whether these exact ` +
+      `settings keep working, which is what the out-of-sample rank above measures.`;
   }
 
   reveal([document.getElementById('of-verdict')], 0);

@@ -328,9 +328,11 @@
           <p id="of-intro">
             The moving-average crossover is optimised on the first 70% of history
             (in-sample), then every parameter pair is scored on the held-out final
-            30% (out-of-sample). Each cell is a (short, long) window pair, coloured
-            by Sharpe ratio on a shared scale. If the strategy were robust, the two
-            panels would look alike. They rarely do.
+            30% (out-of-sample). Each run is first given the bars just before its
+            window to fill its averages, and every in-sample run starts at the same
+            bar, so every cell trades over the same bars. Each cell is a (short,
+            long) window pair, coloured by Sharpe ratio on a shared scale. If the
+            strategy were robust, the two panels would look alike.
           </p>
 
           <div class="heatmap-grids">

@@ -98,6 +98,8 @@ def render_order_book(trades):
 OF_SHORT_WINDOWS = [5, 10, 15, 20]
 OF_LONG_WINDOWS = [25, 50, 100, 200]
 OF_IS_FRACTION = 0.70
+# The first in-sample bar, so every grid cell trades over the same bars.
+OF_WARMUP_START = max(OF_LONG_WINDOWS) - 1
 
 
 async def _ensure_symbol(file_input, ticker_select):
@@ -150,23 +152,23 @@ async def _grid_sharpe(
 ):
     """
     Runs the SMA parameter grid over [start, end] and returns
-    ``(grid, moments, runs_done)``. ``grid`` is a 2D list of Sharpe ratios
-    indexed [short_idx][long_idx]; ``moments`` is a parallel grid of
-    ``(sr_period, n_obs, skew, kurt)`` tuples (per-period, non-annualised) for
-    the Deflated Sharpe Ratio. Cells where short >= long, or that produce no
-    usable curve, are None in both grids. Yields to the event loop between runs
-    so the progress status can repaint.
+    ``(grid, returns_grid, runs_done)``. ``grid`` is a 2D list of Sharpe ratios
+    indexed [short_idx][long_idx]; ``returns_grid`` is a parallel grid of each
+    run's per-bar equity returns, for the Deflated Sharpe Ratio. Cells where
+    short >= long, or that produce no usable curve, are None in both grids; a
+    returns cell is also None when it has fewer than two points or zero std.
+    Yields to the event loop between runs so the progress status can repaint.
     """
     grid = []
-    moments = []
+    returns_grid = []
     runs_done = 0
     for short_w in OF_SHORT_WINDOWS:
         row = []
-        mrow = []
+        rrow = []
         for long_w in OF_LONG_WINDOWS:
             if short_w >= long_w:
                 row.append(None)
-                mrow.append(None)
+                rrow.append(None)
                 continue
             events: deque[Event] = deque()
             strategy = SimpleMovingAverageStrategy(
@@ -199,25 +201,21 @@ async def _grid_sharpe(
             stats = performance.create_summary_stats(portfolio)
             if "error" in stats:
                 row.append(None)
-                mrow.append(None)
+                rrow.append(None)
             else:
                 row.append(stats["sharpe_ratio"])
-                # Per-period Sharpe and higher moments of this run's per-bar
-                # equity returns, for the Deflated Sharpe of the IS-best cell.
                 df = portfolio.generate_equity_curve()
                 returns = df["total"].pct_change().dropna().to_numpy()
                 if len(returns) >= 2 and np.std(returns, ddof=1) > 0:
-                    sr_period = float(np.mean(returns) / np.std(returns, ddof=1))
-                    skew, kurt = performance.returns_moments(returns)
-                    mrow.append((sr_period, len(returns), skew, kurt))
+                    rrow.append(returns)
                 else:
-                    mrow.append(None)
+                    rrow.append(None)
             runs_done += 1
             # Hand control back to the browser so the status text can update.
             await asyncio.sleep(0)
         grid.append(row)
-        moments.append(mrow)
-    return grid, moments, runs_done
+        returns_grid.append(rrow)
+    return grid, returns_grid, runs_done
 
 
 def _rank_cells(grid):
@@ -269,9 +267,9 @@ async def analyse_overfitting(event):
         timestamps = _read_timestamps(csv_path)
         n = len(timestamps)
         split_idx = int(n * OF_IS_FRACTION)
-        if split_idx < 1 or split_idx >= n:
+        if split_idx - OF_WARMUP_START < 2 * max(OF_LONG_WINDOWS):
             raise ValueError("Not enough data to form an in-/out-of-sample split.")
-        is_start, is_end = timestamps[0], timestamps[split_idx - 1]
+        is_start, is_end = timestamps[OF_WARMUP_START], timestamps[split_idx - 1]
         oos_start, oos_end = timestamps[split_idx], timestamps[-1]
 
         # Annualisation factor for the vol-target sizer, from the full history
@@ -289,7 +287,7 @@ async def analyse_overfitting(event):
         total = 2 * valid
 
         status_el.innerText = f"Analysing... 0/{total}"
-        is_grid, is_moments, done_is = await _grid_sharpe(
+        is_grid, is_returns, done_is = await _grid_sharpe(
             symbol,
             is_start,
             is_end,
@@ -330,19 +328,22 @@ async def analyse_overfitting(event):
         _, oos_best_i, oos_best_j = oos_cells[0]
 
         # Deflated Sharpe Ratio of the in-sample pick: correct the IS-best
-        # Sharpe for having tried this many configurations. Variance of the
-        # per-period Sharpes across all valid cells drives the deflation.
-        sr_periods = [m[0] for m_row in is_moments for m in m_row if m is not None]
-        n_trials = len(sr_periods)
-        sr_variance = float(np.var(sr_periods, ddof=1)) if n_trials >= 2 else 0.0
-        best_m = is_moments[is_best_i][is_best_j]
-        if best_m is not None and n_trials >= 2:
-            best_sr, best_n_obs, best_skew, best_kurt = best_m
-            dsr = performance.deflated_sharpe_ratio(
-                best_sr, sr_variance, n_trials, best_n_obs, best_skew, best_kurt
-            )
-        else:
-            dsr = 0.0
+        # Sharpe for having tried every usable cell, counted both as separate
+        # tries and as an effective number of independent tries.
+        trials = []
+        chosen = None
+        for i, r_row in enumerate(is_returns):
+            for j, returns in enumerate(r_row):
+                if returns is not None:
+                    if (i, j) == (is_best_i, is_best_j):
+                        chosen = len(trials)
+                    trials.append(returns)
+        report = None
+        if chosen is not None and len(trials) >= 2:
+            try:
+                report = performance.deflated_sharpe_report(trials, chosen)
+            except ValueError:
+                report = None
 
         payload = {
             "symbol": symbol,
@@ -357,7 +358,7 @@ async def analyse_overfitting(event):
             "is_range": [
                 is_start.date().isoformat(),
                 is_end.date().isoformat(),
-                split_idx,
+                split_idx - OF_WARMUP_START,
             ],
             "oos_range": [
                 oos_start.date().isoformat(),
@@ -372,8 +373,11 @@ async def analyse_overfitting(event):
             "is_best_is_sharpe": is_grid[is_best_i][is_best_j],
             "is_best_oos_sharpe": oos_grid[is_best_i][is_best_j],
             "oos_best_oos_sharpe": oos_grid[oos_best_i][oos_best_j],
-            "dsr": dsr,
-            "dsr_n_trials": n_trials,
+            "dsr": report.dsr if report else None,
+            "dsr_eff": report.dsr_eff if report else None,
+            "dsr_n_trials": report.n_trials if report else None,
+            "n_eff": report.n_eff if report else None,
+            "mean_corr": report.mean_correlation if report else None,
         }
         window.updateHeatmaps(json.dumps(payload))
         _set_icon(status_el, "fa-solid fa-check text-success")
