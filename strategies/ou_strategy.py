@@ -1,21 +1,135 @@
 import math
 from collections import deque
+from dataclasses import dataclass
 
 import numpy as np
 
 from event import Event, MarketEvent, SignalEvent
-from strategy import Strategy  # Assuming Abstract Base Class is defined
+from strategy import Strategy
+
+# MacKinnon (2010) response-surface coefficients for the Dickey-Fuller tau
+# statistic with a constant and no trend: crit = b0 + b1/T + b2/T^2 + b3/T^3.
+MACKINNON_TAU_C: dict[float, tuple[float, float, float, float]] = {
+    0.01: (-3.43035, -6.5393, -16.786, -79.433),
+    0.05: (-2.86154, -2.8903, -4.234, -40.040),
+    0.10: (-2.56677, -1.5384, -2.809, 0.0),
+}
+
+GATE_LEVELS: tuple[float, ...] = (0.01, 0.05, 0.10)
+
+GATE_LABELS: dict[float, str] = {
+    0.01: "1% level",
+    0.05: "5% level",
+    0.10: "10% level",
+}
+
+
+def dickey_fuller_critical_value(level: float, n_obs: int) -> float:
+    """Critical value of the Dickey-Fuller t-statistic at `level` for a regression on `n_obs` observations."""
+    if level not in MACKINNON_TAU_C:
+        raise ValueError(f"No Dickey-Fuller critical values for level {level}.")
+    if n_obs < 3:
+        raise ValueError("The Dickey-Fuller test needs at least 3 observations.")
+    b0, b1, b2, b3 = MACKINNON_TAU_C[level]
+    return b0 + b1 / n_obs + b2 / n_obs**2 + b3 / n_obs**3
+
+
+@dataclass(frozen=True)
+class OUCalibration:
+    mu: float  # equilibrium log price
+    sigma_eq: float  # equilibrium standard deviation of the log price
+    theta: float  # mean-reversion speed per bar
+    half_life: float  # ln 2 / theta, in bars
+    t_stat: float  # Dickey-Fuller t-statistic of b
+    mean_reverting: bool  # 0 < phi < 1, so mu, sigma_eq, theta and half_life are valid
+    passed: bool  # mean_reverting and the Dickey-Fuller test (if any) passed: a trade may be opened
+
+
+def _failed(t_stat: float = math.nan) -> OUCalibration:
+    return OUCalibration(0.0, 0.0, 0.0, math.inf, t_stat, False, False)
+
+
+def calibrate_ou(log_prices: np.ndarray, gate_level: float | None) -> OUCalibration:
+    """
+    Fits dx_t = a + b * x_{t-1} + e_t by OLS on a window of log prices and maps
+    it exactly to an OU process: phi = 1 + b, theta = -ln(phi), mu = -a / b,
+    sigma_eq = sigma_eps / sqrt(1 - phi^2).
+
+    The window passes when 0 < phi < 1 and, if `gate_level` is set, the
+    Dickey-Fuller t-statistic of b is below the critical value at that level.
+    """
+    x = log_prices[:-1]
+    y = np.diff(log_prices)
+    n = len(y)
+    if n < 3:
+        return _failed()
+
+    sxx = float(np.sum((x - np.mean(x)) ** 2))
+    if sxx == 0:
+        return _failed()
+
+    b, a = np.polyfit(x, y, 1)
+    residuals = y - (a + b * x)
+    sigma_eps = math.sqrt(float(np.sum(residuals**2)) / (n - 2))
+    if sigma_eps == 0:
+        return _failed()
+
+    t_stat = float(b / (sigma_eps / math.sqrt(sxx)))
+    phi = 1 + b
+    if not (b < -1e-8 and phi > 0):
+        return _failed(t_stat)
+
+    theta = -math.log(phi)
+    mu = -a / b
+    sigma_eq = sigma_eps / math.sqrt(1 - phi**2)
+    passed = gate_level is None or t_stat < dickey_fuller_critical_value(gate_level, n)
+    return OUCalibration(
+        float(mu),
+        float(sigma_eq),
+        float(theta),
+        math.log(2) / theta,
+        t_stat,
+        True,
+        passed,
+    )
+
+
+def gate_summary(
+    gate_level: float | None,
+    windows_tested: int,
+    windows_passed: int,
+    window_size: int,
+    traded: bool,
+) -> str:
+    """One-line description of how often the mean-reversion check passed."""
+    if windows_tested == 0:
+        return (
+            "The mean-reversion check never ran: the data is shorter than the "
+            f"{window_size}-bar window."
+        )
+    label = "sign check only" if gate_level is None else GATE_LABELS[gate_level]
+    pct = 100 * windows_passed / windows_tested
+    text = (
+        f"Mean-reversion check ({label}) passed on {pct:.1f}% of "
+        f"{windows_tested:,} windows. Trades only open while the latest window passes."
+    )
+    if not traded:
+        text += " No trades were made."
+    return text
 
 
 class OrnsteinUhlenbeckStrategy(Strategy):
     """
-    Dynamically estimates the parameters of an Ornstein-Uhlenbeck
-    process using a rolling window of prices to generate mean-reversion signals.
+    Mean-reversion strategy that fits an Ornstein-Uhlenbeck process to a rolling
+    window of prices and trades the z-score of the latest price.
 
-    The OU process is fit on **log-prices** (``ln P``), so the calibrated mean
-    ``mu`` and equilibrium standard deviation ``sigma_eq`` live in log-price
-    space and the resulting z-score is scale-invariant: a 1% move contributes
-    the same z regardless of the absolute price level.
+    The fit is an AR(1) regression on log prices, so the z-score is scale-invariant.
+    The regression maps to the OU parameters exactly (phi = 1 + b, theta = -ln phi),
+    not by the Euler approximation.
+    A trade opens only when the window passes a Dickey-Fuller test that rejects a
+    random walk at the chosen level.
+    A held position exits when its z-score reaches the exit level, or at once when
+    the window shows no mean reversion at all.
     """
 
     def __init__(
@@ -26,6 +140,7 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         entry_z: float = 2.0,
         exit_z: float = 0.0,
         allow_short: bool = False,
+        gate_level: float | None = 0.05,
     ):
         """
         Args:
@@ -40,12 +155,23 @@ class OrnsteinUhlenbeckStrategy(Strategy):
             allow_short: When False (the default) the strategy is long-only and
                 only enters when price is below equilibrium. When True it also
                 shorts when price is above equilibrium.
+            gate_level: Dickey-Fuller significance level a window must pass
+                before a trade is opened (0.01, 0.05 or 0.10), or None to
+                require only 0 < phi < 1. A held position is not closed just
+                because the test fails.
         """
         super().__init__(events, allow_short)
+        if gate_level is not None and gate_level not in GATE_LEVELS:
+            raise ValueError(
+                f"gate_level must be one of {GATE_LEVELS} or None, got {gate_level}."
+            )
         self.symbol = symbol
         self.window_size = window_size
         self.entry_z = entry_z
         self.exit_z = exit_z
+        self.gate_level = gate_level
+        self.windows_tested = 0
+        self.windows_passed = 0
 
         # Rolling window of log-prices used for calibration. Position state
         # (intent / position) is inherited from Strategy and keyed by symbol.
@@ -59,41 +185,9 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         if event.symbol == self.symbol and event.close > 0:
             self.prices.append(math.log(event.close))
 
-    def _calibrate_ou_parameters(self) -> tuple[float, float, float]:
-        """
-        Maps the OU process to an AutoRegressive AR(1) model: x_t - x_{t-1} = a + b*x_{t-1} + error
-        Returns the dynamic mean, standard deviation, and a valid flag.
-        """
-        # Convert deque to numpy array for vector math
-        price_series = np.array(self.prices)
-
-        # x is lagged prices (t-1), y is price differences (t)
-        x = price_series[:-1]
-        y = np.diff(price_series)
-
-        # Perform Linear Regression (OLS) -> y = mx + c
-        # np.polyfit returns [slope (b), intercept (a)]
-        b, a = np.polyfit(x, y, 1)
-
-        # Calculate OU Parameters (assuming dt = 1)
-        theta = -b
-
-        # If theta is non-positive the series is diverging or a pure random
-        # walk (not mean reverting). A small epsilon guards against floating
-        # point noise from making a flat/trending series look mean-reverting.
-        if theta <= 1e-8:
-            return 0.0, 0.0, False
-
-        mu = a / theta
-
-        # Calculate the equilibrium standard deviation
-        residuals = y - (a + b * x)
-        sigma = np.std(residuals, ddof=1)
-
-        # Equilibrium variance of the OU process is sigma^2 / 2*theta
-        sigma_eq = sigma / np.sqrt(2 * theta)
-
-        return mu, sigma_eq, True
+    def _calibrate(self) -> OUCalibration:
+        """Fits the OU process to the current window of log prices."""
+        return calibrate_ou(np.array(self.prices), self.gate_level)
 
     def calculate_signals(self, event: MarketEvent) -> None:
         """
@@ -118,23 +212,40 @@ class OrnsteinUhlenbeckStrategy(Strategy):
         if len(self.prices) < self.window_size:
             return
 
-        # 1. Calibrate the SDE (on log-prices)
-        mu, sigma_eq, is_mean_reverting = self._calibrate_ou_parameters()
+        fit = self._calibrate()
+        self.windows_tested += 1
+        if fit.passed:
+            self.windows_passed += 1
 
-        if not is_mean_reverting or sigma_eq == 0:
-            return  # Process is wandering, do not trade
-
-        # 2. Calculate current Z-Score relative to the dynamic OU equilibrium.
-        # mu / sigma_eq are in log-price space, so the current price must be too.
-        z_score = (log_price - mu) / sigma_eq
-
-        # 3. Generate Trading Logic. Decisions key off intent (what we've asked
-        # for), not fill-truth, so a signal is not re-emitted while its order is
-        # still pending its next-open fill.
+        # Decisions key off intent (what we've asked for), not fill-truth, so a
+        # signal is not re-emitted while its order is still pending its
+        # next-open fill.
         signal: SignalEvent | None = None
         current_intent = self.intent.get(self.symbol)
 
-        if current_intent is None:
+        # The test decides when to open a trade. A held position exits on its
+        # z-score, using this window's fit even if the window fails the test.
+        if current_intent in ("LONG", "SHORT"):
+            if not fit.mean_reverting:
+                # The window no longer shows any mean reversion, so there is no
+                # equilibrium to exit at.
+                signal = SignalEvent(self.symbol, event.timestamp, "EXIT")
+                self.intent[self.symbol] = None
+            else:
+                z_score = (log_price - fit.mu) / fit.sigma_eq
+                if current_intent == "LONG" and z_score >= self.exit_z:
+                    signal = SignalEvent(self.symbol, event.timestamp, "EXIT")
+                    self.intent[self.symbol] = None
+
+                elif current_intent == "SHORT" and z_score <= self.exit_z:
+                    signal = SignalEvent(self.symbol, event.timestamp, "EXIT")
+                    self.intent[self.symbol] = None
+
+        elif fit.passed:
+            # mu and sigma_eq are in log-price space, so the current price must
+            # be too.
+            z_score = (log_price - fit.mu) / fit.sigma_eq
+
             # Price is too high -> Expect reversion down -> SHORT
             if z_score > self.entry_z and self.allow_short:
                 signal = SignalEvent(self.symbol, event.timestamp, "SHORT")
@@ -144,15 +255,6 @@ class OrnsteinUhlenbeckStrategy(Strategy):
             elif z_score < -self.entry_z:
                 signal = SignalEvent(self.symbol, event.timestamp, "LONG")
                 self.intent[self.symbol] = "LONG"
-
-        else:  # We are already in a trade, look for exit conditions
-            if current_intent == "LONG" and z_score >= self.exit_z:
-                signal = SignalEvent(self.symbol, event.timestamp, "EXIT")
-                self.intent[self.symbol] = None
-
-            elif current_intent == "SHORT" and z_score <= self.exit_z:
-                signal = SignalEvent(self.symbol, event.timestamp, "EXIT")
-                self.intent[self.symbol] = None
 
         # Push the signal onto the shared event queue so the engine's event
         # loop can route it to the portfolio.
