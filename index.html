@@ -143,6 +143,17 @@
                   <input type="number" id="ou-exit-z" value="0.0" step="0.1">
                 </div>
               </div>
+              <div class="param-row" style="margin-top: 10px;">
+                <div class="param-field">
+                  <span>Mean-reversion check</span>
+                  <select id="ou-gate">
+                    <option value="0.01">Strict (1% level)</option>
+                    <option value="0.05" selected>Normal (5% level)</option>
+                    <option value="0.10">Loose (10% level)</option>
+                    <option value="off">Off (sign check only)</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -263,6 +274,7 @@
               </div>
             </div>
           </div>
+          <p id="strategy-notes" class="run-notes"></p>
 
           <div id="error-output"></div>
 

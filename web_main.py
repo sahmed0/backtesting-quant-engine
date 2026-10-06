@@ -24,7 +24,7 @@ from position_sizing import (
     PercentEquitySizer,
     VolatilityTargetSizer,
 )
-from strategies.ou_strategy import OrnsteinUhlenbeckStrategy
+from strategies.ou_strategy import OrnsteinUhlenbeckStrategy, gate_summary
 from strategy import SimpleMovingAverageStrategy
 
 
@@ -409,6 +409,7 @@ async def run_backtest(event):
     # Clear previous logs and the bootstrap-CI caption from any prior run.
     document.getElementById("order-log-body").replaceChildren()
     document.getElementById("cap-sharpe-ci").innerText = ""
+    document.getElementById("strategy-notes").innerText = ""
 
     try:
         ticker_select = document.getElementById("ticker-select")
@@ -451,6 +452,8 @@ async def run_backtest(event):
             window_size = int(document.getElementById("ou-window").value)
             entry_z = float(document.getElementById("ou-entry-z").value)
             exit_z = float(document.getElementById("ou-exit-z").value)
+            gate_value = document.getElementById("ou-gate").value
+            gate_level = None if gate_value == "off" else float(gate_value)
             if window_size < 10:
                 raise ValueError("OU window must be at least 10 periods.")
             strategy = OrnsteinUhlenbeckStrategy(
@@ -460,6 +463,7 @@ async def run_backtest(event):
                 entry_z=entry_z,
                 exit_z=exit_z,
                 allow_short=allow_short,
+                gate_level=gate_level,
             )
         else:
             short_window = int(document.getElementById("sma-short").value)
@@ -584,6 +588,15 @@ async def run_backtest(event):
             document.getElementById(
                 "val-duration"
             ).innerText = f"{stats['avg_trade_duration']:.1f} days"
+
+            if isinstance(strategy, OrnsteinUhlenbeckStrategy):
+                document.getElementById("strategy-notes").innerText = gate_summary(
+                    strategy.gate_level,
+                    strategy.windows_tested,
+                    strategy.windows_passed,
+                    strategy.window_size,
+                    len(portfolio.trades) > 0,
+                )
 
             # Pass data to JS for charts
             df = portfolio.generate_equity_curve()

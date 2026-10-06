@@ -643,6 +643,17 @@ button:disabled {
   min-height: 0.9rem;
 }
 
+.run-notes {
+  font-size: 0.76rem;
+  color: var(--text-tertiary);
+  margin: 10px 0 0;
+  line-height: 1.4;
+}
+
+.run-notes:empty {
+  display: none;
+}
+
 /* Dynamic Colors applied via JS */
 .text-success {
   color: var(--success) !important;
