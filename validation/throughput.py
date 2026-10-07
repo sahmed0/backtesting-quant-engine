@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import platform
 import statistics
 import sys
 import time
@@ -81,6 +82,10 @@ def main() -> None:
     print(
         f"{SYMBOL}: {bars} bars, median of {N_RUNS} runs "
         f"-> {median_rate:,.0f} bars/sec (CLI, CPython)"
+    )
+    print(
+        f"Machine: {platform.system()} {platform.release()}, {platform.machine()}, "
+        f"{platform.processor() or 'unknown CPU'}, Python {platform.python_version()}"
     )
 
 

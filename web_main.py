@@ -440,7 +440,7 @@ async def run_backtest(event):
         else:
             status_el.innerText = "No data source selected."
             btn.disabled = False
-            _set_icon(btn, "fa-solid fa-play", " Run Backtest")
+            _set_icon(btn, "fa-solid fa-play", " Execute Backtest")
             return
 
         # Initialise backtest components
@@ -642,7 +642,7 @@ async def run_backtest(event):
         status_el.innerText = "An error occurred during execution."
     finally:
         btn.disabled = False
-        _set_icon(btn, "fa-solid fa-play", " Run Backtest")
+        _set_icon(btn, "fa-solid fa-play", " Execute Backtest")
 
     return True
 
