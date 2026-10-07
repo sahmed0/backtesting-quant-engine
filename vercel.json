@@ -1,4 +1,24 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "builds": [{ "src": "**", "use": "@vercel/static" }]
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
+  "builds": [
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "static/**", "use": "@vercel/static" },
+    { "src": "public/**", "use": "@vercel/static" },
+    { "src": "data/*.csv", "use": "@vercel/static" },
+    { "src": "strategies/*.py", "use": "@vercel/static" },
+    { "src": "data.py", "use": "@vercel/static" },
+    { "src": "strategy.py", "use": "@vercel/static" },
+    { "src": "position_sizing.py", "use": "@vercel/static" },
+    { "src": "portfolio.py", "use": "@vercel/static" },
+    { "src": "execution.py", "use": "@vercel/static" },
+    { "src": "engine.py", "use": "@vercel/static" },
+    { "src": "event.py", "use": "@vercel/static" },
+    { "src": "performance.py", "use": "@vercel/static" },
+    { "src": "web_main.py", "use": "@vercel/static" }
+  ]
 }
