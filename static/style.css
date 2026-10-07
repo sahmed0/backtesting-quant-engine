@@ -216,10 +216,6 @@ p {
   }
 }
 
-.topbar-social {
-  flex: none;
-}
-
 /* --- Layout Grid --- */
 .dashboard-container {
   width: 100%;
@@ -401,6 +397,11 @@ input[type="file"]:focus {
 
 .param-field input[type="number"] {
   cursor: text;
+}
+
+.param-field input,
+.param-field select {
+  margin-top: auto;
 }
 
 /* Drag & Drop Style File Input */
@@ -646,7 +647,7 @@ button:disabled {
 .run-notes {
   font-size: 0.76rem;
   color: var(--text-tertiary);
-  margin: 10px 0 0;
+  margin: 10px 0;
   line-height: 1.4;
 }
 
@@ -770,7 +771,7 @@ button:disabled {
   margin-bottom: 30px;
   background: var(--bg-inset);
   border-radius: var(--radius-lg);
-  padding: 15px;
+  padding: 1rem;
   box-sizing: border-box;
   border: 1px solid var(--border);
   overflow: hidden;
@@ -778,10 +779,10 @@ button:disabled {
 }
 
 .chart-wrapper-sub {
-  height: 130px;
-  max-height: 130px;
-  margin-bottom: 30px;
-  padding-top: 10px;
+  height: 160px;
+  max-height: 160px;
+  margin-bottom: 1rem;
+  padding-top: 2rem;
 }
 
 .chart-subtitle {
@@ -1056,6 +1057,16 @@ tr:hover td {
   color: var(--text-tertiary);
 }
 
+.footer-legal a {
+  color: var(--text-tertiary);
+  text-decoration: underline;
+  transition: color 0.15s ease;
+}
+
+.footer-legal a:hover {
+  color: var(--accent);
+}
+
 .social-icons {
   display: flex;
   gap: 1rem;
@@ -1063,7 +1074,7 @@ tr:hover td {
 
 .social-icons a {
   color: var(--text-secondary);
-  font-size: 1.15rem;
+  font-size: 1.5rem;
   transition: color 0.15s ease;
 }
 

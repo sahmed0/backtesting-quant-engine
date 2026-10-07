@@ -599,3 +599,6 @@ window.updateHeatmaps = function (payloadJSON) {
 
   reveal([document.getElementById('of-verdict')], 0);
 };
+
+// --- Footer year ---
+document.getElementById('year').textContent = new Date().getFullYear();
