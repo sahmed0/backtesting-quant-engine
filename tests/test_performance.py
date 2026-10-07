@@ -22,6 +22,7 @@ from performance import (
     deflated_sharpe_report,
     effective_number_of_trials,
     expected_max_sharpe,
+    format_throughput,
     infer_periods_per_year,
     mean_pairwise_correlation,
     normal_cdf,
@@ -553,3 +554,11 @@ def test_bootstrap_samples_share_the_rng_across_batches():
     rng_single = np.random.default_rng(50)
     single = bootstrap_sharpe_samples(returns, 252.0, 60, rng_single)
     assert batched == single
+
+
+def test_format_throughput():
+    assert format_throughput(6599, 0.91) == "6,599 bars in 0.91 s (7,252 bars/s)"
+
+
+def test_format_throughput_zero_seconds():
+    assert format_throughput(6599, 0.0) == "6,599 bars in under 0.01 s"

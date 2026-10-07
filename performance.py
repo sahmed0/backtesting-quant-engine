@@ -570,3 +570,10 @@ def sharpe_confidence_interval(
     lo = float(np.percentile(samples, tail))
     hi = float(np.percentile(samples, 100.0 - tail))
     return lo, hi
+
+
+def format_throughput(bars: int, seconds: float) -> str:
+    """'6,599 bars in 0.91 s (7,252 bars/s)'. Seconds shown to 2 dp; rate rounded to a whole number."""
+    if seconds <= 0:
+        return f"{bars:,} bars in under 0.01 s"
+    return f"{bars:,} bars in {seconds:.2f} s ({bars / seconds:,.0f} bars/s)"

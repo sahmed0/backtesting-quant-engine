@@ -3,6 +3,7 @@ import csv
 import json
 import os
 import re
+import time
 import traceback
 from collections import deque
 from datetime import UTC, datetime
@@ -410,6 +411,7 @@ async def run_backtest(event):
     document.getElementById("order-log-body").replaceChildren()
     document.getElementById("cap-sharpe-ci").innerText = ""
     document.getElementById("strategy-notes").innerText = ""
+    document.getElementById("run-timing").innerText = ""
 
     try:
         ticker_select = document.getElementById("ticker-select")
@@ -518,7 +520,13 @@ async def run_backtest(event):
         def on_progress(bars: int) -> None:
             status_el.innerText = f"Running... {bars} bars"
 
+        start = time.perf_counter()
         await backtest.run(progress_cb=on_progress)
+        elapsed = time.perf_counter() - start
+        bars = len(portfolio.all_holdings)
+        document.getElementById("run-timing").innerText = performance.format_throughput(
+            bars, elapsed
+        )
 
         status_el.innerText = "Calculating performance..."
 
