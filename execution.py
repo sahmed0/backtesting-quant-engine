@@ -21,7 +21,7 @@ from portfolio import Portfolio
 
 logger = logging.getLogger(__name__)
 
-FillTiming = Literal["next_open", "same_close"]
+FillTiming = Literal["next_open", "same_close", "same_open"]
 
 DEFAULT_COMMISSION_PER_SHARE = 0.005
 DEFAULT_MIN_COMMISSION = 1.00
@@ -87,7 +87,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         Args:
             events: The shared event queue.
             data_handler: Supplies the latest bar, used as the execution price
-                in "same_close" mode only.
+                in the "same_close" and "same_open" modes only.
             portfolio: Consulted at fill time for affordability.
             commission_per_share: Dollars charged per share filled. The
                 actual commission is max(commission_per_share × qty,
@@ -97,12 +97,12 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 0.0005 for 5 bps. Applied by trade *side*: a BUY pays more
                 (open × (1 + s)), a SELL receives less (open × (1 − s)). EXITs
                 are BUYs or SELLs like any other fill, so they carry slippage too.
-            fill_timing: "next_open" (the honest default) queues orders to fill
-                at the next bar's open. "same_close" fills immediately at the
-                latest close, reproducing the look-ahead this engine used to
-                have. It exists solely so the fill-timing impact script can
-                measure what that look-ahead was worth, and must not be exposed
-                in the UI.
+            fill_timing: "next_open" (the default) queues orders to fill at the
+                next bar's open. "same_close" fills at the close the signal was
+                computed from, and "same_open" fills at that same bar's open,
+                both look-ahead. They exist only so
+                validation/fill_timing_impact.py can measure what each
+                look-ahead is worth, and must not be exposed in the UI.
         """
         self.events = events
         self.data_handler = data_handler
@@ -119,7 +119,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
     def execute_order(self, event: OrderEvent) -> None:
         """
         Accepts an order. In "next_open" mode this only queues it; the fill
-        happens on the next bar. In "same_close" mode it fills at once.
+        happens on the next bar. The same-bar modes fill at once.
         """
         if self.fill_timing == "next_open":
             self._pending.append(event)
@@ -129,7 +129,11 @@ class SimulatedExecutionHandler(ExecutionHandler):
         if latest_bar is None:
             self._fail(event, event.timestamp, "NO_PRICE")
             return
-        self._try_fill(event, latest_bar.close, latest_bar.timestamp)
+        if self.fill_timing == "same_open":
+            base_price = latest_bar.open
+        else:
+            base_price = latest_bar.close
+        self._try_fill(event, base_price, latest_bar.timestamp)
 
     def on_market(self, event: MarketEvent) -> None:
         """

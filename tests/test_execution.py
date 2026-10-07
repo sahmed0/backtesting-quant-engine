@@ -268,6 +268,30 @@ def test_same_close_mode_fills_immediately_at_latest_close(events, bars, portfol
     assert fill.fill_price == pytest.approx(100.05)
 
 
+def test_same_open_fills_at_signal_bar_open(events, bars, portfolio):
+    data_handler = InMemoryDataHandler(bars)
+    handler = SimulatedExecutionHandler(
+        events,
+        data_handler,
+        portfolio,
+        commission_per_share=COMMISSION_PER_SHARE,
+        min_commission=MIN_COMMISSION,
+        slippage_pct=SLIPPAGE,
+        fill_timing="same_open",
+    )
+    data_handler.update_bars()
+    data_handler.update_bars()  # bar 1 (open 110, close 111) is the latest bar
+
+    handler.execute_order(_order(bars, bar_index=1))
+
+    assert len(events) == 1
+    fill = events.popleft()
+    assert isinstance(fill, FillEvent)
+    # BUY at bar 1's own open: 110 * (1 + 0.0005) = 110.055
+    assert fill.fill_price == pytest.approx(110 * (1 + SLIPPAGE))
+    assert fill.timestamp == bars[1].timestamp
+
+
 def test_same_close_mode_fails_with_no_price(events, bars, portfolio):
     handler = SimulatedExecutionHandler(
         events,

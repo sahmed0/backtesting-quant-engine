@@ -1,22 +1,15 @@
 """
-Show how much of the backtest's returns disappear once trades fill honestly.
+Measure how much of the backtest's performance comes from fill timing.
 
-The engine's key rule is that a trade signaled on a bar's close can't also
-fill at that same close - that would be looking into the future. Instead it
-fills at the next bar's open. Letting trades fill on the signal bar's own
-close was the biggest reason the old engine looked better than it should
-have. This script measures that effect directly: it runs the same AAPL
-backtest twice, changing only when fills happen, and shows how much of the
-headline Sharpe ratio and return comes from that unrealistic timing.
+Runs the same AAPL backtest three times, changing only when orders fill:
 
-  * ``same_close`` - fills right away, on the same close that triggered the
-    signal. This is unrealistic (it's look-ahead bias) and only exists here
-    for comparison.
-  * ``next_open``  - fills at the next bar's open.
+  * ``same_close`` - fills at the close the signal was computed from (mild look-ahead).
+  * ``same_open``  - fills at the signal bar's own open, before the close that
+    produced the signal was known (severe look-ahead).
+  * ``next_open``  - fills at the next bar's open (the engine's default).
 
-Everything else (data, strategy, position sizing, costs) is identical
-between the two runs, so any difference in results comes from fill timing
-alone.
+Everything else (data, strategy, position sizing, costs) is identical between
+the runs, so any difference in results comes from fill timing alone.
 
 Usage:
   python validation/fill_timing_impact.py
@@ -48,6 +41,13 @@ SHORT_WINDOW = 5
 LONG_WINDOW = 20
 INITIAL_CAPITAL = 100_000.0
 
+MODES: list[tuple[FillTiming, str, str]] = [
+    ("same_close", "same close", "(mild)"),
+    ("same_open", "same open", "(severe)"),
+    ("next_open", "next open", "(honest)"),
+]
+WIDTHS = [10, 13, 13]
+
 
 async def _run(fill_timing: FillTiming) -> dict:
     """Runs one AAPL backtest under the given fill timing, returns its stats."""
@@ -73,12 +73,13 @@ def main() -> None:
         print(f"Error: data file not found at {csv_path}")
         sys.exit(1)
 
-    same_close = asyncio.run(_run("same_close"))
-    next_open = asyncio.run(_run("next_open"))
-    for name, stats in (("same_close", same_close), ("next_open", next_open)):
+    results = []
+    for mode, _, _ in MODES:
+        stats = asyncio.run(_run(mode))
         if "error" in stats:
-            print(f"Error in {name} run: {stats['error']}")
+            print(f"Error in {mode} run: {stats['error']}")
             sys.exit(1)
+        results.append(stats)
 
     print("=" * 72)
     print(
@@ -86,31 +87,25 @@ def main() -> None:
         f"PercentEquity(0.1)"
     )
     print("=" * 72)
-    print("Same-bar fills overstate performance by transacting at a price the")
-    print("strategy had already seen. next_open fills at the following bar's open.")
-    print()
-
-    header = f"{'Metric':<18}{'same_close':>14}{'next_open':>14}{'delta':>14}"
+    header = f"{'Metric':<18}"
+    notes = " " * 18
+    for (_, name, note), width in zip(MODES, WIDTHS, strict=True):
+        header += f"{name:>{width}}"
+        notes += " " * (width - len(name)) + f"{note:<{len(name)}}"
     print(header)
-    print("-" * len(header))
+    print(notes.rstrip())
+    print("-" * 72)
 
-    def row(label: str, sc: float, no: float, pct: bool) -> None:
-        if pct:
-            print(
-                f"{label:<18}{sc * 100:>13.2f}%{no * 100:>13.2f}%"
-                f"{(no - sc) * 100:>13.2f}%"
-            )
-        else:
-            print(f"{label:<18}{sc:>14.2f}{no:>14.2f}{no - sc:>14.2f}")
+    def row(label: str, key: str, fmt: str) -> None:
+        cells = (
+            format(r[key], f">{w}{fmt}") for r, w in zip(results, WIDTHS, strict=True)
+        )
+        print(f"{label:<18}" + "".join(cells))
 
-    row("Sharpe", same_close["sharpe_ratio"], next_open["sharpe_ratio"], pct=False)
-    row("Total Return", same_close["total_return"], next_open["total_return"], pct=True)
-    row("Max Drawdown", same_close["max_drawdown"], next_open["max_drawdown"], pct=True)
-    print(
-        f"{'# Trades':<18}{same_close['num_trades']:>14d}"
-        f"{next_open['num_trades']:>14d}"
-        f"{next_open['num_trades'] - same_close['num_trades']:>14d}"
-    )
+    row("Sharpe", "sharpe_ratio", ".2f")
+    row("Total Return", "total_return", ".2%")
+    row("Max Drawdown", "max_drawdown", ".2%")
+    row("# Trades", "num_trades", "d")
     print("=" * 72)
 
 
