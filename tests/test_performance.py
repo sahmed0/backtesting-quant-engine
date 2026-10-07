@@ -296,10 +296,9 @@ def _daily_curve(totals, prices):
 
 
 def test_create_summary_stats_end_to_end():
-    df = _daily_curve(
-        totals=[100_000.0, 101_000.0, 100_500.0, 102_000.0],
-        prices=[100.0, 101.0, 100.5, 102.0],
-    )
+    totals = np.array([100_000.0, 101_000.0, 100_500.0, 102_000.0])
+    prices = np.array([100.0, 102.0, 99.0, 101.5])
+    df = _daily_curve(totals=totals, prices=prices)
     # Three completed round trips, two of them winners -> win rate 2/3.
     trades = [
         make_trade("AAPL", "LONG", 10, 100.0),
@@ -320,10 +319,26 @@ def test_create_summary_stats_end_to_end():
     assert abs(stats["win_rate"] - 2.0 / 3.0) < 1e-12
     # Daily bars -> 365.25 periods/year (7-day density in this synthetic curve).
     assert abs(stats["periods_per_year"] - 365.25) < 1e-6
-    # Benchmark-relative and risk-adjusted metrics are present and finite.
-    for key in ("sharpe_ratio", "alpha", "information_ratio", "calmar_ratio", "cagr"):
-        assert key in stats
-        assert np.isfinite(stats[key])
+
+    ppy = 365.25
+    returns = np.diff(totals) / totals[:-1]
+    sharpe = returns.mean() / returns.std(ddof=1) * np.sqrt(ppy)
+    bench = np.diff(prices) / prices[:-1]
+    beta = np.cov(returns, bench)[0, 1] / bench.var(ddof=1)
+    alpha = (returns.mean() - beta * bench.mean()) * ppy
+    active = returns - bench
+    information_ratio = active.mean() / active.std(ddof=1) * np.sqrt(ppy)
+    years = 3 * DAY / (ppy * DAY)
+    cagr = (totals[-1] / totals[0]) ** (1 / years) - 1
+    peak = np.maximum.accumulate(totals)
+    max_dd = np.max((peak - totals) / peak)
+
+    assert stats["sharpe_ratio"] == pytest.approx(sharpe, rel=1e-12)
+    assert stats["alpha"] == pytest.approx(alpha, rel=1e-12)
+    assert stats["information_ratio"] == pytest.approx(information_ratio, rel=1e-12)
+    assert stats["cagr"] == pytest.approx(cagr, rel=1e-12)
+    assert stats["max_drawdown"] == pytest.approx(max_dd, rel=1e-12)
+    assert stats["calmar_ratio"] == pytest.approx(cagr / max_dd, rel=1e-12)
 
 
 def test_create_summary_stats_no_trades_gives_zero_win_rate():

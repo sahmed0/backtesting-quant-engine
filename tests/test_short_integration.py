@@ -113,14 +113,3 @@ def test_short_scenario_matches_the_hand_traced_ledger():
     # Final state: cash 8549.34, equity 9449.34 (10 shares still open at 90).
     assert portfolio.current_cash == pytest.approx(8549.34, rel=1e-9)
     assert portfolio.total_equity() == pytest.approx(9449.34, rel=1e-9)
-
-
-def test_short_scenario_margin_checks_pass():
-    """
-    The two margin checks that must clear: bar 4 (9999 >= 0.5*939.53 + 1) and
-    bar 9 (9833.98 >= 0.5*999.50 + 1). If either failed, the short would be
-    rejected and the fill count above would drop - this asserts the intent
-    directly on the numbers.
-    """
-    assert 9999.00 >= 0.5 * 939.53 + 1.0
-    assert 9833.98 >= 0.5 * 999.50 + 1.0

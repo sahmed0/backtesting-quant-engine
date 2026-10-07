@@ -75,28 +75,6 @@ def _build(bars, signal_on=1, capital=100_000.0):
     return backtest, portfolio, execution, strategy
 
 
-def test_engine_initialization(bars):
-    events: deque[Event] = deque()
-    data_handler = InMemoryDataHandler(bars)
-    portfolio = Portfolio(events)
-    strategy = SignalOnBarStrategy(events)
-    execution = SimulatedExecutionHandler(events, data_handler, portfolio)
-
-    backtest = Backtest(
-        data_handler=data_handler,
-        strategy=strategy,
-        portfolio=portfolio,
-        execution_handler=execution,
-        events=events,
-    )
-
-    assert backtest.data_handler is data_handler
-    assert backtest.strategy is strategy
-    assert backtest.portfolio is portfolio
-    assert backtest.execution_handler is execution
-    assert backtest.events is events
-
-
 def test_signal_on_bar_t_fills_at_bar_t_plus_1_open(bars):
     """The headline invariant: a signal on bar t fills at bar t+1's open."""
     backtest, portfolio, _, strategy = _build(bars, signal_on=1)
