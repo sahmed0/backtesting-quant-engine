@@ -16,7 +16,6 @@ from performance import (
     calculate_cagr,
     calculate_drawdown,
     calculate_sharpe_ratio,
-    calculate_trade_stats,
     completed_round_trips,
     create_summary_stats,
     deflated_sharpe_ratio,
@@ -29,6 +28,7 @@ from performance import (
     normal_ppf,
     returns_moments,
     sharpe_confidence_interval,
+    trade_stats,
 )
 from position_sizing import FractionalKellySizer
 
@@ -235,24 +235,24 @@ def test_round_trips_skips_zero_notional():
     assert completed_round_trips(trades) == []
 
 
-# --- calculate_trade_stats ---------------------------------------------------
+# --- trade_stats -------------------------------------------------------------
 
 
-def test_calculate_trade_stats_count_and_duration():
+def test_trade_stats_count_and_duration():
     trades = [
         make_trade("AAPL", "LONG", 10, 100.0, timestamp=BASE_TS),
         make_trade("AAPL", "EXIT", 10, 110.0, timestamp=BASE_TS + 2 * DAY),
         make_trade("AAPL", "LONG", 10, 110.0, timestamp=BASE_TS + 3 * DAY),
         make_trade("AAPL", "EXIT", 10, 120.0, timestamp=BASE_TS + 7 * DAY),
     ]
-    num_trades, avg_duration_days = calculate_trade_stats(trades)
+    num_trades, avg_duration_days = trade_stats(completed_round_trips(trades))
     assert num_trades == 2
     # Durations: 2 days and 4 days -> average 3.0 days.
     assert abs(avg_duration_days - 3.0) < 1e-12
 
 
-def test_calculate_trade_stats_empty():
-    assert calculate_trade_stats([]) == (0, 0.0)
+def test_trade_stats_empty():
+    assert trade_stats(completed_round_trips([])) == (0, 0.0)
 
 
 # --- Kelly delegation regression --------------------------------------------

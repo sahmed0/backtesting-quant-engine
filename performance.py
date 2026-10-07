@@ -94,8 +94,7 @@ def calculate_cagr(
     if initial_equity <= 0 or final_equity <= 0 or len(timestamps) < 2:
         return 0.0
 
-    seconds_per_year = 365.25 * 24 * 3600
-    years = (timestamps[-1] - timestamps[0]) / seconds_per_year
+    years = (timestamps[-1] - timestamps[0]) / SECONDS_PER_YEAR
     if years <= 0:
         return 0.0
 
@@ -192,13 +191,11 @@ def completed_round_trips(trades: list[dict]) -> list[dict]:
     return trips
 
 
-def calculate_trade_stats(trades: list[dict]) -> tuple[int, float]:
+def trade_stats(trips: list[dict]) -> tuple[int, float]:
     """
-    Returns (number_of_completed_round_trips, average_duration_in_days) from the
-    shared round-trip pairing. A position still open at the end of the run is
-    not counted, as it has no closing duration.
+    Returns (number_of_round_trips, average_duration_in_days) for round trips
+    already paired by completed_round_trips.
     """
-    trips = completed_round_trips(trades)
     num_trades = len(trips)
 
     seconds_per_day = 24 * 3600
@@ -265,12 +262,7 @@ def create_summary_stats(portfolio: Portfolio) -> dict:
     calmar_ratio = cagr / max_drawdown if max_drawdown > 0 else 0.0
 
     # Round-trip trade count and average holding period (from the same pairing).
-    num_trades = len(trips)
-    seconds_per_day = 24 * 3600
-    durations = [t["exit_ts"] - t["entry_ts"] for t in trips]
-    avg_trade_duration = (
-        (sum(durations) / len(durations) / seconds_per_day) if durations else 0.0
-    )
+    num_trades, avg_trade_duration = trade_stats(trips)
 
     # Benchmark-relative metrics (buy-and-hold of the underlying asset). These
     # require the per-bar asset price, which is only present when the equity
