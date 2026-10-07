@@ -247,7 +247,7 @@ def create_summary_stats(portfolio: Portfolio) -> dict:
     max_drawdown = calculate_drawdown(equity_curve)
 
     # Win Rate (trades): fraction of completed round trips that were profitable
-    # net of commissions. The old per-bar hit rate is dropped.
+    # net of commissions.
     trips = completed_round_trips(portfolio.trades)
     if trips:
         wins = sum(1 for t in trips if t["net_pnl"] > 0)

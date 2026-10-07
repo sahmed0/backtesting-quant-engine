@@ -76,7 +76,7 @@ def _order(
 
 
 def test_order_does_not_fill_on_the_bar_it_is_placed(handler, events, bars):
-    """The whole point of the change: no same-bar fills."""
+    """Orders never fill on the bar that produced them."""
     handler.execute_order(_order(bars))
 
     assert len(events) == 0
@@ -242,9 +242,9 @@ def test_orders_fill_fifo(handler, events, bars, portfolio):
 
 def test_same_close_mode_fills_immediately_at_latest_close(events, bars, portfolio):
     """
-    The look-ahead mode kept only for the fill-timing impact comparison. It still
-    runs the affordability check, so the only difference from next_open is when
-    the fill happens.
+    A look-ahead mode that exists only for the fill-timing impact comparison. It
+    still runs the affordability check, so the only difference from next_open is
+    when the fill happens.
     """
     data_handler = InMemoryDataHandler(bars)
     handler = SimulatedExecutionHandler(

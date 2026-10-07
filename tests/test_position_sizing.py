@@ -227,7 +227,7 @@ class TestFractionalKellySizer(unittest.TestCase):
     def test_round_trip_cost_excludes_slippage(self):
         # Slippage is already embedded in the fill prices, so the round-trip
         # cost nets commissions only. Entry+exit each carry commission 1.0 and a
-        # (now report-only) slippage 5.0.
+        # reported slippage of 5.0.
         trades = [
             make_trade("AAPL", "LONG", 10, 100.0, commission=1.0, slippage=5.0),
             make_trade("AAPL", "EXIT", 10, 110.0, commission=1.0, slippage=5.0),

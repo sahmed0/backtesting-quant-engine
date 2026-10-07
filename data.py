@@ -17,10 +17,7 @@ REQUIRED_COLUMNS = frozenset({"timestamp", "open", "high", "low", "close", "volu
 
 
 class DataHandler(ABC):
-    """
-    Abstract base class for data handlers.
-    Provides an interface for fetching historical or live market data.
-    """
+    """Interface for fetching historical or live market data."""
 
     @abstractmethod
     def get_latest_bar(self, symbol: str) -> MarketEvent | None:
@@ -47,12 +44,7 @@ class DataHandler(ABC):
 
 
 class CSVDataHandler(DataHandler):
-    """
-    Streams bars for a single symbol from a CSV file.
-
-    Each row is parsed exactly once, at construction of the MarketEvent, and
-    every consumer reads the typed event rather than re-parsing strings.
-    """
+    """Streams bars for a single symbol from a CSV file, parsing each row once."""
 
     def __init__(
         self,

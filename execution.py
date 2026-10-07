@@ -228,9 +228,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self.events.append(fill_event)
 
     def _fail(self, order: OrderEvent, timestamp: datetime, reason: FailReason) -> None:
-        """
-        Queues an OrderFailedEvent for a dead order.
-        """
+        """Queues an OrderFailedEvent for a dead order."""
         self.events.append(
             OrderFailedEvent(
                 symbol=order.symbol,

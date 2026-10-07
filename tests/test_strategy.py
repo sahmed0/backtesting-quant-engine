@@ -148,7 +148,7 @@ class TestSimpleMovingAverageStrategy(unittest.TestCase):
 
     def test_rejected_order_reverts_intent_and_signal_refires(self):
         """
-        The canonical desync scenario, now fixed.
+        The canonical desync scenario.
 
         A LONG signal is emitted (intent -> LONG) but its order is rejected
         (e.g. the sizer declined). on_order_failed must revert intent to

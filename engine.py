@@ -51,7 +51,7 @@ class Backtest:
         Warm-up bars are fed to the portfolio's sizer and the strategy first,
         and are never traded or marked.
 
-        The per-bar sequence is load-bearing and must not be reordered:
+        Each bar is processed in this order:
 
           1. Fill orders queued on the previous bar, at THIS bar's open.
           2. Mark to market at this bar's close, with those fills reflected.

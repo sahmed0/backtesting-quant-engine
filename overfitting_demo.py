@@ -15,7 +15,7 @@ visible and measurable:
 The gap between the IS and OOS results is the over-fitting "tax". As a second,
 sharper illustration the script also evaluates every parameter set on the OOS
 period (something you could only do with hindsight) to show that the IS winner
-is usually *not* the OOS winner -- the ranking does not survive contact with
+is usually not the OOS winner: the ranking does not survive contact with
 unseen data.
 
 Run:  python overfitting_demo.py [SYMBOL]   (default SYMBOL: AAPL)

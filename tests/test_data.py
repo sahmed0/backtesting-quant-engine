@@ -68,7 +68,7 @@ class TestCSVDataHandler(unittest.TestCase):
 
     def test_get_latest_bar_before_first_update(self):
         """
-        Before any bar has been read there is no bar to return -- None, not an
+        Before any bar has been read there is no bar to return: None, not an
         empty dict, so callers can branch on a real absence.
         """
         self.assertIsNone(self.handler.get_latest_bar("AAPL"))

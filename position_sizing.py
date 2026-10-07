@@ -58,9 +58,8 @@ class PositionSizer(ABC):
 
 class FixedSizer(PositionSizer):
     """
-    Trades a constant quantity regardless of price or equity. This reproduces
-    the engine's original behaviour and is the default so existing runs are
-    unchanged.
+    Trades a constant quantity regardless of price or equity. The portfolio's
+    default sizer.
     """
 
     def __init__(self, quantity: float = 100.0):

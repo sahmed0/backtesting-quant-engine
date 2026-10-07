@@ -32,14 +32,11 @@ class Portfolio:
         sizer: PositionSizer | None = None,
     ):
         """
-        Initialises the portfolio with a starting capital and a position sizer.
-
         Args:
             events: The shared event queue.
             initial_capital: Starting cash.
             sizer: Strategy for converting signals into order quantities. When
-                omitted, defaults to a fixed 100-unit size to preserve the
-                engine's original behaviour.
+                omitted, defaults to a fixed 100-unit size.
         """
         self.events = events
         self.initial_capital = initial_capital
@@ -206,9 +203,7 @@ class Portfolio:
         quantity: float,
         reason: FailReason,
     ) -> None:
-        """
-        Queues an OrderFailedEvent so a dead order is never a silent drop.
-        """
+        """Queues an OrderFailedEvent so a dead order is never a silent drop."""
         self.events.append(
             OrderFailedEvent(
                 symbol=symbol,
