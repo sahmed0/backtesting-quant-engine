@@ -353,8 +353,9 @@ def main() -> None:
     label = f"Buy and hold {symbol} (100% invested)"
     print(f"  {label:<45}{_fmt_curve(bh_sharpe, bh_return, bh_maxdd)}")
     print(
-        f"  Total returns are not comparable: the strategy puts at most "
-        f"{SIZING_FRACTION:.0%} of equity in the stock."
+        f"  Compare Sharpe ratios, not total returns: the strategy puts "
+        f"{SIZING_FRACTION:.0%} of equity into\n  each new position and never "
+        f"tops it up or trims it, while buy and hold is fully invested."
     )
 
     if naive is not None:
