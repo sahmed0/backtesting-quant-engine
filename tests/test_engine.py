@@ -9,6 +9,7 @@ t+1's open - lives in the interaction between them, which mocks cannot show.
 import asyncio
 from collections import deque
 from datetime import UTC, datetime
+from typing import Literal
 
 import pytest
 from conftest import InMemoryDataHandler, make_bars
@@ -217,3 +218,57 @@ def test_sma_with_warmup_can_signal_on_first_live_bar():
     cold = SimpleMovingAverageStrategy(cold_events, short_window=2, long_window=3)
     cold.calculate_signals(live)
     assert len(cold_events) == 0
+
+
+class DeclineFirstLongSizer(FixedSizer):
+    """Fixed size, but declines the first LONG entry it is asked to size."""
+
+    def __init__(self, quantity: float = 10.0):
+        super().__init__(quantity)
+        self.declined = False
+
+    def size(
+        self,
+        symbol: str,
+        direction: Literal["LONG", "SHORT"],
+        price: float,
+        portfolio: Portfolio,
+    ) -> float:
+        if direction == "LONG" and not self.declined:
+            self.declined = True
+            return 0.0
+        return self.quantity
+
+
+def test_declined_entry_during_reversal_does_not_double_the_next_entry():
+    """
+    A reversal from SHORT to LONG emits EXIT then LONG on the same bar. If the
+    sizer declines the LONG, the EXIT still fills next bar and the strategy is
+    flat. It must open exactly one LONG afterwards, not one per bar until a
+    fill confirms it.
+    """
+    # Falling closes open a short, then rising closes trigger the reversal.
+    closes = [100, 99, 98, 97, 96, 95, 96, 98, 101, 104, 107, 110, 113, 116, 119]
+    bars = make_bars([(c, c + 1, c - 1, c) for c in closes])
+    events: deque[Event] = deque()
+    data_handler = InMemoryDataHandler(bars)
+    strategy = SimpleMovingAverageStrategy(
+        events, short_window=2, long_window=4, allow_short=True
+    )
+    portfolio = Portfolio(
+        events, initial_capital=100_000.0, sizer=DeclineFirstLongSizer(10.0)
+    )
+    execution = SimulatedExecutionHandler(
+        events,
+        data_handler,
+        portfolio,
+        commission_per_share=0.0,
+        min_commission=0.0,
+        slippage_pct=0.0,
+    )
+    asyncio.run(Backtest(data_handler, strategy, portfolio, execution, events).run())
+
+    assert [t["direction"] for t in portfolio.trades] == ["SHORT", "EXIT", "LONG"]
+    assert portfolio.current_positions["TEST"] == 10.0
+    assert strategy.intent["TEST"] == "LONG"
+    assert strategy.position["TEST"] == "LONG"

@@ -26,8 +26,8 @@ class Strategy(ABC):
 
     The lifecycle for a symbol: flat (``intent``/``position`` both ``None``) ->
     a signal sets ``intent`` -> the fill at the next open confirms ``position``.
-    If instead the order is rejected, ``on_order_failed`` reverts ``intent`` back
-    to fill-truth so the lost signal can fire again later. Without this, a
+    If instead an entry is rejected, ``on_order_failed`` resets ``intent`` to
+    flat so the lost signal can fire again later. Without this, a
     rejected order would leave the strategy believing it holds a position it
     never got, suppressing every subsequent signal for that symbol.
     """
@@ -84,13 +84,21 @@ class Strategy(ABC):
 
     def on_order_failed(self, event: OrderFailedEvent) -> None:
         """
-        Reverts intent to fill-truth when an order dies.
+        Clears intent when an entry order dies.
 
-        The order the strategy asked for never happened, so ``intent`` is rolled
-        back to whatever the strategy actually holds. The signal that produced
-        the failed order is thus free to fire again on a later qualifying bar.
+        The entry the strategy asked for never happened, so the signal that
+        produced it is free to fire again on a later qualifying bar. Intent
+        becomes flat rather than a copy of ``position``: on a reversal the
+        entry is paired with an EXIT that may still be pending, and once that
+        EXIT fills the strategy is flat. Copying ``position`` here would leave a
+        stale SHORT (or LONG) intent and a second entry later.
+
+        A failed EXIT leaves intent alone. An exit only fails when there is
+        nothing to close or the data has ended, and an entry placed alongside
+        it may still be pending.
         """
-        self.intent[event.symbol] = self.position.get(event.symbol)
+        if event.direction != "EXIT":
+            self.intent[event.symbol] = None
 
 
 class SimpleMovingAverageStrategy(Strategy):
