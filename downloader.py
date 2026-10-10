@@ -94,6 +94,6 @@ if __name__ == "__main__":
     download_data(
         tickers=sample_tickers,
         start_date="2000-01-01",
-        end_date="2026-03-31",
+        end_date="2026-10-10",
         output_dir="data",
     )
