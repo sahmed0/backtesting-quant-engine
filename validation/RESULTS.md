@@ -6,29 +6,29 @@ The same strategy runs through this engine and backtrader 1.9.78.123, and every 
 
 ## Verdict
 
-Run A has no costs and is the pass/fail gate. It passes when every trade matches and final equity agrees to within 0.01%. Result: PASS (372 trades, equity difference 2.50e-16).
+Run A has no costs and is the pass/fail gate. It passes when every trade matches and final equity agrees to within 0.01%. Result: PASS (379 trades, equity difference 4.78e-16).
 
 Run B adds commission and is reported but not gated. Slippage stays at 0 in both runs because backtrader applies none to market orders by default, so including ours would create a difference that isn't real.
 
 ## Run A: no costs
 
-Our engine made 372 trades and backtrader made 372. Final equity is 116294.776567 for ours and 116294.776567 for backtrader.
+Our engine made 379 trades and backtrader made 379. Final equity is 121843.866407 for ours and 121843.866407 for backtrader.
 
 ### Trades (ours)
 
 | # | date | side | qty | price |
 |---|---|---|---|---|
-| 0 | 2000-02-01 | BUY | 100 | 0.779038 |
-| 1 | 2000-02-04 | SELL | 100 | 0.778570 |
-| 2 | 2000-02-08 | BUY | 100 | 0.853945 |
-| 3 | 2000-03-21 | SELL | 100 | 0.918085 |
-| 4 | 2000-03-22 | BUY | 100 | 0.994631 |
-| … | _362 rows omitted_ | | | |
-| 367 | 2025-12-18 | SELL | 100 | 273.354202 |
-| 368 | 2026-02-03 | BUY | 100 | 268.948351 |
-| 369 | 2026-02-20 | SELL | 100 | 258.970001 |
-| 370 | 2026-02-26 | BUY | 100 | 274.950012 |
-| 371 | 2026-03-04 | SELL | 100 | 264.649994 |
+| 0 | 2000-02-01 | BUY | 100 | 0.777650 |
+| 1 | 2000-02-04 | SELL | 100 | 0.777183 |
+| 2 | 2000-02-08 | BUY | 100 | 0.852424 |
+| 3 | 2000-03-21 | SELL | 100 | 0.916450 |
+| 4 | 2000-03-22 | BUY | 100 | 0.992859 |
+| … | _369 rows omitted_ | | | |
+| 374 | 2026-07-07 | BUY | 100 | 315.018319 |
+| 375 | 2026-08-05 | SELL | 100 | 309.093424 |
+| 376 | 2026-08-26 | BUY | 100 | 310.299988 |
+| 377 | 2026-10-06 | SELL | 100 | 332.279999 |
+| 378 | 2026-10-09 | BUY | 100 | 331.700012 |
 
 ### Mismatches
 
@@ -36,33 +36,33 @@ _No mismatches._
 
 ### Analysis
 
-All 372 fills match on date, side, quantity and price to 6 decimal places. A signal on bar t's close fills at bar t+1's open in both engines, so the fill dates line up bar for bar.
+All 379 fills match on date, side, quantity and price to 6 decimal places. A signal on bar t's close fills at bar t+1's open in both engines, so the fill dates line up bar for bar.
 
 No orders were dropped at the end of the data. The last signal is an exit that fills on the final bar, so neither engine is left with a pending order. If one were left, our engine would drop it and count it in `dropped_orders`, and backtrader would also leave it unfilled, so the two would still agree.
 
-Final equity matches to a relative difference of 2.50e-16.
+Final equity matches to a relative difference of 4.78e-16.
 
 ## Run B: with commission
 
 Commission is `max(0.005 * shares, 1.0)` dollars per fill in both engines: `SimulatedExecutionHandler` on our side, and a custom `bt.CommInfoBase._getcommission` on backtrader's.
 
-Our engine made 372 trades and backtrader made 372. Final equity is 115922.776567 for ours and 115922.776567 for backtrader.
+Our engine made 379 trades and backtrader made 379. Final equity is 121464.866407 for ours and 121464.866407 for backtrader.
 
 ### Trades (ours)
 
 | # | date | side | qty | price |
 |---|---|---|---|---|
-| 0 | 2000-02-01 | BUY | 100 | 0.779038 |
-| 1 | 2000-02-04 | SELL | 100 | 0.778570 |
-| 2 | 2000-02-08 | BUY | 100 | 0.853945 |
-| 3 | 2000-03-21 | SELL | 100 | 0.918085 |
-| 4 | 2000-03-22 | BUY | 100 | 0.994631 |
-| … | _362 rows omitted_ | | | |
-| 367 | 2025-12-18 | SELL | 100 | 273.354202 |
-| 368 | 2026-02-03 | BUY | 100 | 268.948351 |
-| 369 | 2026-02-20 | SELL | 100 | 258.970001 |
-| 370 | 2026-02-26 | BUY | 100 | 274.950012 |
-| 371 | 2026-03-04 | SELL | 100 | 264.649994 |
+| 0 | 2000-02-01 | BUY | 100 | 0.777650 |
+| 1 | 2000-02-04 | SELL | 100 | 0.777183 |
+| 2 | 2000-02-08 | BUY | 100 | 0.852424 |
+| 3 | 2000-03-21 | SELL | 100 | 0.916450 |
+| 4 | 2000-03-22 | BUY | 100 | 0.992859 |
+| … | _369 rows omitted_ | | | |
+| 374 | 2026-07-07 | BUY | 100 | 315.018319 |
+| 375 | 2026-08-05 | SELL | 100 | 309.093424 |
+| 376 | 2026-08-26 | BUY | 100 | 310.299988 |
+| 377 | 2026-10-06 | SELL | 100 | 332.279999 |
+| 378 | 2026-10-09 | BUY | 100 | 331.700012 |
 
 ### Mismatches
 
@@ -70,6 +70,6 @@ _No mismatches._
 
 ### Analysis
 
-All 372 fills match on date, side, quantity and price to 6 decimal places. A signal on bar t's close fills at bar t+1's open in both engines, so the fill dates line up bar for bar.
+All 379 fills match on date, side, quantity and price to 6 decimal places. A signal on bar t's close fills at bar t+1's open in both engines, so the fill dates line up bar for bar.
 
-Final equity matches to a relative difference of 2.51e-16.
+Final equity matches to a relative difference of 4.79e-16.
