@@ -98,7 +98,7 @@ jobs:
       cancel-in-progress: false
     environment:
       name: production
-      url: https://backtest-engine-three.vercel.app
+      url: https://backtest.sajidahmed.co.uk
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

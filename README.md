@@ -1,13 +1,13 @@
 # Quantitative Trading Backtesting Engine
 
-[![CI](https://github.com/sahmed0/backtesting-quant-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/sahmed0/backtesting-quant-engine/actions/workflows/ci.yml)
+[![CI](https://github.com/sahmed0/backtesting-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/sahmed0/backtesting-engine/actions/workflows/ci.yml)
 [![Browser-Native](https://img.shields.io/badge/Runtime-PyScript-brightgreen)](https://pyscript.net/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A trading-strategy simulator that also measures how much of a strategy's success
 is real and how much is luck.
 
-## [Live demo](https://backtest-engine-three.vercel.app/)
+## [Live demo](https://backtest.sajidahmed.co.uk/)
 
 <p align="center">
   <img src="public/preview.png" alt="Dashboard after a backtest of Apple stock, showing performance figures and the portfolio's value over time" width="800">
